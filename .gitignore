@@ -35,6 +35,20 @@ wp-config.php
 # htaccess
 /.htaccess
 
+# Dependencies
+vendor/
+
+# Environment
+wp-config.php
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
 # All plugins
 #
 # Note: If you wish to whitelist plugins,
