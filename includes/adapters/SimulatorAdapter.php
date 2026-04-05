@@ -1,22 +1,79 @@
 <?php
 
-/**
- * Simulates AB Tasty Flagship SDK in Bucketing mode
- */
-class SimulatorAdapter implements DecisionAdapterInterface {
+if (!defined('ABSPATH')) {
+    exit;
+}
 
-    private const TRAFFIC_SPLIT = 50;
+use Flagship\Flagship;
+use Flagship\Config\FlagshipConfig;
+use Flagship\Enum\LogLevel;
+use Flagship\Enum\CacheStrategy;
+
+/**
+ * Flagship SDK implementation of the decision adapter.
+ * Connects to AB Tasty Flagship API to decide which variant a visitor should see.
+ * Requires FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY constants defined in wp-config.php.
+ */
+class FlagshipAdapter implements DecisionAdapterInterface {
+
+    private static bool $initialized = false;
 
     /**
-     * Decides which variant a visitor should see
+     * Initializes the Flagship SDK once per request
+     */
+    private function initialize(): void {
+        if (self::$initialized) {
+            return;
+        }
+
+        if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {
+            error_log('[AB Test] Flagship credentials not found. Define FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY in wp-config.php.');
+            return;
+        }
+
+        Flagship::start(
+            FLAGSHIP_ENV_ID,
+            FLAGSHIP_API_KEY,
+            FlagshipConfig::decisionApi()
+                ->setLogLevel(LogLevel::ERROR)
+                ->setHitCacheImplementation(new HitCacheRedis())
+                ->setCacheStrategy(CacheStrategy::BATCHING_AND_CACHING_ON_FAILURE)
+        );
+
+        self::$initialized = true;
+    }
+
+    /**
+     * Decides which variant a visitor should see using Flagship SDK.
+     * Returns 'control' if the flag is not found or if an error occurs.
      *
      * @param string $visitorId
-     * @param string $experimentId
-     * @return string control or variation_b
+     * @param string $experimentId Flag key as defined in Flagship dashboard
+     * @return string
      */
     public function decide(string $visitorId, string $experimentId): string {
-        $bucket = abs(crc32($visitorId . $experimentId)) % 100;
+        $this->initialize();
 
-        return $bucket < self::TRAFFIC_SPLIT ? 'control' : 'variation_b';
+        try {
+            $visitor = Flagship::newVisitor($visitorId, true)->build();
+            $visitor->fetchFlags();
+
+            $flag = $visitor->getFlag($experimentId);
+
+            if (!$flag->exists()) {
+                error_log("[AB Test] Flag '{$experimentId}' not found in Flagship. Serving control.");
+                return 'control';
+            }
+
+            $value = $flag->getValue(true, 'control');
+
+            error_log("[AB Test] Flagship decision for '{$experimentId}': {$value}");
+
+            return (string) $value;
+
+        } catch (\Exception $e) {
+            error_log('[AB Test] Flagship error: ' . $e->getMessage() . '. Serving control.');
+            return 'control';
+        }
     }
 }

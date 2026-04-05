@@ -1,5 +1,9 @@
 <?php
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Generates a unique visitor ID based on request parameters
  */
@@ -21,8 +25,8 @@ class Fingerprint {
     }
 
     /**
-     * Gets the real client IP
-     * 
+     * Gets the real client IP respecting proxies and Cloudflare
+     *
      * @return string Client IP address
      */
     private function getClientIp(): string {
@@ -33,6 +37,16 @@ class Fingerprint {
             'REMOTE_ADDR',
         ];
 
+        foreach ($headers as $header) {
+            if (!empty($_SERVER[$header])) {
+                $ip = trim(explode(',', $_SERVER[$header])[0]);
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    return $ip;
+                }
+            }
+        }
+
+        // Fallback: accept private IPs for local development
         foreach ($headers as $header) {
             if (!empty($_SERVER[$header])) {
                 $ip = trim(explode(',', $_SERVER[$header])[0]);

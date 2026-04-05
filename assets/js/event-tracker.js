@@ -1,15 +1,16 @@
 /**
  * AB Test Event Tracker
  *
- * Reads the experiment configuration defined in window.abTestConfig and registers click listeners for each element,
- * when a click is detected, it sends a hit to the WordPress REST API endpoint which forwards it to Flagship
+ * Reads the experiment configuration defined in window.abTestConfig and registers
+ * event listeners for each element. When an event is detected, it sends a hit to
+ * the WordPress REST API endpoint which forwards it to Flagship.
  */
 
 (function () {
 
     /**
-     * Sends a hit event to the WordPress REST API endpoint
-     * Retries up to 3 times if the request fails
+     * Sends a hit event to the WordPress REST API endpoint.
+     * Retries up to 3 times if the request fails.
      *
      * @param {string} experimentId
      * @param {string} eventName
@@ -17,15 +18,16 @@
      * @param {number} attempt
      */
     function sendHit(experimentId, eventName, variant, attempt = 1) {
-        const MAX_ATTEMPTS = 3;
-        const RETRY_DELAY_MS = 1000;
-        const { visitorId, apiUrl, nonce } = window.abTestData;
+        const MAX_ATTEMPTS    = 3;
+        const RETRY_DELAY_MS  = 1000;
+        const { visitorId }   = window.abTestData;
+        const { apiUrl, nonce } = window.abtfConfig;
 
         fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-WP-Nonce': nonce
+                'X-ABTF-Nonce': nonce
             },
             body: JSON.stringify({
                 visitor_id:    visitorId,
@@ -61,8 +63,8 @@
      * Registers event listeners for all experiments defined in window.abTestConfig
      */
     function registerListeners() {
-        if (!window.abTestConfig || !window.abTestData) {
-            console.warn('[AB Test] abTestConfig or abTestData not found.');
+        if (!window.abTestConfig || !window.abTestData || !window.abtfConfig) {
+            console.warn('[AB Test] abTestConfig, abTestData or abtfConfig not found.');
             return;
         }
 
@@ -74,7 +76,7 @@
                 return;
             }
 
-            const variant = window.abTestData.experiments[config.experimentId];
+            const variant   = window.abTestData.experiments[config.experimentId];
             const eventType = config.type || 'click';
 
             element.addEventListener(eventType, function () {

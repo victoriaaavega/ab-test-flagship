@@ -6,14 +6,37 @@ if (!defined('ABSPATH')) {
 
 use Flagship\Cache\IHitCacheImplementation;
 
+/**
+ * Redis implementation of Flagship's hit cache.
+ * Stores failed hits and retries them automatically when Flagship::close() is called.
+ */
 class HitCacheRedis implements IHitCacheImplementation {
 
-    private Redis $redis;
+    private const REDIS_HOST    = '127.0.0.1';
+    private const REDIS_PORT    = 6379;
+    private const REDIS_TIMEOUT = 0.05; // 50ms
+    private const REDIS_DB      = 1;    // separate DB index from variant cache
+
+    private ?Redis $redis = null;
+    private bool $available = true;
 
     public function __construct() {
-        $this->redis = new Redis();
-        $this->redis->connect('127.0.0.1', 6379, 0.05);
-        $this->redis->select(1); // separate DB index from variant cache
+        $this->connect();
+    }
+
+    /**
+     * Connects to Redis safely
+     */
+    private function connect(): void {
+        try {
+            $this->redis = new Redis();
+            $this->redis->connect(self::REDIS_HOST, self::REDIS_PORT, self::REDIS_TIMEOUT);
+            $this->redis->select(self::REDIS_DB);
+        } catch (Exception $e) {
+            error_log('[AB Test] HitCacheRedis connection failed: ' . $e->getMessage());
+            $this->available = false;
+            $this->redis     = null;
+        }
     }
 
     /**
@@ -22,6 +45,10 @@ class HitCacheRedis implements IHitCacheImplementation {
      * @param array $hits
      */
     public function cacheHit(array $hits): void {
+        if (!$this->available || $this->redis === null) {
+            return;
+        }
+
         try {
             $pipeline = $this->redis->multi();
             foreach ($hits as $key => $hit) {
@@ -39,8 +66,13 @@ class HitCacheRedis implements IHitCacheImplementation {
      * @return array
      */
     public function lookupHits(): array {
+        if (!$this->available || $this->redis === null) {
+            return [];
+        }
+
         try {
             $keys = $this->redis->keys('*');
+
             if (empty($keys)) {
                 return [];
             }
@@ -49,8 +81,11 @@ class HitCacheRedis implements IHitCacheImplementation {
             $hitsOut = [];
 
             foreach ($hits as $index => $hit) {
-                if ($hit) {
-                    $hitsOut[$keys[$index]] = json_decode($hit, true);
+                if ($hit !== false) {
+                    $decoded = json_decode($hit, true);
+                    if ($decoded !== null) {
+                        $hitsOut[$keys[$index]] = $decoded;
+                    }
                 }
             }
 
@@ -67,6 +102,10 @@ class HitCacheRedis implements IHitCacheImplementation {
      * @param array $hitKeys
      */
     public function flushHits(array $hitKeys): void {
+        if (!$this->available || $this->redis === null || empty($hitKeys)) {
+            return;
+        }
+
         try {
             $this->redis->del($hitKeys);
         } catch (Exception $e) {
@@ -78,6 +117,10 @@ class HitCacheRedis implements IHitCacheImplementation {
      * Deletes all cached hits
      */
     public function flushAllHits(): void {
+        if (!$this->available || $this->redis === null) {
+            return;
+        }
+
         try {
             $this->redis->flushDB();
         } catch (Exception $e) {

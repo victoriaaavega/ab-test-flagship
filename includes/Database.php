@@ -1,7 +1,12 @@
 <?php
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
- * Handles all database operations for AB test variant storage
+ * Handles all database operations for AB test variant storage.
+ * Used as fallback when Redis is unavailable.
  */
 class Database {
 
@@ -21,7 +26,6 @@ class Database {
 
     /**
      * Retrieves the assigned variant for a visitor and experiment
-     * Returns null if no assignment is found
      *
      * @param string $experimentId
      * @param string $visitorId
@@ -32,7 +36,7 @@ class Database {
 
         $result = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT variant FROM {$this->getTableName()} WHERE experiment_id = %s AND visitor_id = %s",
+                "SELECT variant FROM {$this->getTableName()} WHERE experiment_id = %s AND visitor_id = %s LIMIT 1",
                 $experimentId,
                 $visitorId
             )
@@ -42,7 +46,8 @@ class Database {
     }
 
     /**
-     * Saves the assigned variant for a visitor and experiment
+     * Saves the assigned variant for a visitor and experiment.
+     * Uses INSERT IGNORE to avoid duplicates on race conditions.
      *
      * @param string $experimentId
      * @param string $visitorId

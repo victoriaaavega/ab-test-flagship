@@ -1,15 +1,12 @@
 <?php
 
-require_once ABTF_PLUGIN_DIR . 'includes/Fingerprint.php';
-require_once ABTF_PLUGIN_DIR . 'includes/RedisClient.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Database.php';
-require_once ABTF_PLUGIN_DIR . 'includes/adapters/DecisionAdapterInterface.php';
-require_once ABTF_PLUGIN_DIR . 'includes/adapters/SimulatorAdapter.php';
-require_once ABTF_PLUGIN_DIR . 'includes/adapters/FlagshipAdapter.php';
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 /**
- * Orchestrates the complete AB test flow for a specific experiment, can be called multiple times on the
- * same page for different experiments
+ * Orchestrates the complete AB test flow for a specific experiment.
+ * Can be called multiple times on the same page for different experiments.
  */
 class ExperimentRunner {
 
@@ -29,7 +26,7 @@ class ExperimentRunner {
     /**
      * Runs the AB test flow for a specific experiment.
      *
-     * @param string $experimentId
+     * @param string $experimentId Flag key as defined in Flagship dashboard
      * @return array{experimentId: string, visitorId: string, variant: string, source: string}
      */
     public function run(string $experimentId): array {
@@ -50,7 +47,8 @@ class ExperimentRunner {
     }
 
     /**
-     * Handles the experiment flow when Redis is available
+     * Handles the experiment flow when Redis is available.
+     * Saves to both Redis and DB to keep them in sync.
      *
      * @param string $experimentId
      * @param string $visitorId
@@ -69,12 +67,13 @@ class ExperimentRunner {
         $this->redis->saveVariant($experimentId, $visitorId, $variant);
         $this->database->saveVariant($experimentId, $visitorId, $variant);
 
-        error_log("[AB Test] New visitor. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
+        error_log("[AB Test] New visitor assigned. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
         return $this->buildResult($experimentId, $visitorId, $variant, 'redis');
     }
 
     /**
-     * Handles the experiment flow when Redis is unavailable
+     * Handles the experiment flow when Redis is unavailable.
+     * Uses database as fallback.
      *
      * @param string $experimentId
      * @param string $visitorId
@@ -92,7 +91,7 @@ class ExperimentRunner {
 
         $this->database->saveVariant($experimentId, $visitorId, $variant);
 
-        error_log("[AB Test] New visitor saved to database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
+        error_log("[AB Test] New visitor assigned to database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
         return $this->buildResult($experimentId, $visitorId, $variant, 'database');
     }
 
@@ -102,7 +101,7 @@ class ExperimentRunner {
      * @param string $experimentId
      * @param string $visitorId
      * @param string $variant
-     * @param string $source 'redis' or 'database'
+     * @param string $source redis or database
      * @return array
      */
     private function buildResult(string $experimentId, string $visitorId, string $variant, string $source): array {
@@ -115,32 +114,40 @@ class ExperimentRunner {
     }
 
     /**
-     * Sets headers to prevent the page from being served from cache
+     * Sets headers to prevent the page from being served from cache.
+     * In production, Kinsta handles this via Nginx rules.
      */
     private function setCacheBypassHeaders(): void {
+        if (headers_sent()) {
+            return;
+        }
+
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
         header('Expires: 0');
     }
 
     /**
-     * Sets a first-party cookie with the visitor ID for Heap identity sync
+     * Sets a first-party cookie with the visitor ID for Heap identity sync.
+     * JavaScript reads this cookie and calls heap.identify().
      *
      * @param string $visitorId
      */
     private function setHeapIdentityCookie(string $visitorId): void {
-        if (!isset($_COOKIE['heap_visitor_id'])) {
-            setcookie(
-                'heap_visitor_id',
-                $visitorId,
-                [
-                    'expires'  => time() + (60 * 60 * 24 * 30),
-                    'path'     => '/',
-                    'secure'   => false,
-                    'httponly' => false,
-                    'samesite' => 'Lax',
-                ]
-            );
+        if (headers_sent() || isset($_COOKIE['heap_visitor_id'])) {
+            return;
         }
+
+        setcookie(
+            'heap_visitor_id',
+            $visitorId,
+            [
+                'expires'  => time() + (60 * 60 * 24 * 30),
+                'path'     => '/',
+                'secure'   => is_ssl(),
+                'httponly' => false,
+                'samesite' => 'Lax',
+            ]
+        );
     }
 }

@@ -1,8 +1,12 @@
 /**
  * Heap Identity Sync
+ *
+ * Reads the visitor ID cookie set by PHP and calls heap.identify()
+ * to sync the server-side visitor ID with Heap Analytics.
  */
 
 (function () {
+
     /**
      * Reads a cookie value by name
      *
@@ -18,12 +22,18 @@
     }
 
     /**
-     * Simulates heap.identify() call
+     * Calls heap.identify() with the visitor ID
+     * Waits for Heap to be available if it hasn't loaded yet
      *
      * @param {string} visitorId
      */
     function identifyVisitor(visitorId) {
-        console.log('[Heap Sync] identify called with visitor ID:', visitorId);
+        if (typeof window.heap !== 'undefined' && typeof window.heap.identify === 'function') {
+            window.heap.identify(visitorId);
+            console.log('[Heap Sync] identify called with visitor ID:', visitorId);
+        } else {
+            console.warn('[Heap Sync] Heap not available. Visitor ID not synced:', visitorId);
+        }
     }
 
     const visitorId = getCookie('heap_visitor_id');
@@ -33,4 +43,5 @@
     } else {
         console.warn('[Heap Sync] No visitor ID cookie found.');
     }
+
 })();
