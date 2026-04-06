@@ -19,6 +19,7 @@ use Flagship\Enum\CacheStrategy;
  */
 class EventEndpoint
 {
+    private static bool $flagshipInitialized = false;
 
     public function __construct()
     {
@@ -61,7 +62,7 @@ class EventEndpoint
     }
 
     /**
-     * Validates that the request comes from the site using WordPress nonce
+     * Validates that the request comes from the site using a WordPress nonce.
      *
      * @param WP_REST_Request $request
      * @return bool|WP_Error
@@ -90,7 +91,7 @@ class EventEndpoint
     }
 
     /**
-     * Handles incoming event requests
+     * Handles incoming event requests.
      *
      * @param WP_REST_Request $request
      * @return WP_REST_Response
@@ -108,7 +109,7 @@ class EventEndpoint
 
         if (!$result['success']) {
             // In development, missing credentials is expected — respond 200 so JS does not retry.
-            // In production with real credentials, this branch should never be reached.
+            // Any other failure is a real server error and returns 500.
             $statusCode = str_contains($result['message'], 'credentials') ? 200 : 500;
 
             return new WP_REST_Response([
@@ -116,10 +117,42 @@ class EventEndpoint
                 'message' => $result['message'],
             ], $statusCode);
         }
+
+        return new WP_REST_Response([
+            'success'    => true,
+            'message'    => 'Hit sent successfully.',
+            'experiment' => $experimentId,
+            'event'      => $eventName,
+            'variant'    => $variant,
+        ], 200);
     }
 
     /**
-     * Sends a hit to Flagship using the PHP SDK
+     * Initializes the Flagship SDK once per request lifecycle.
+     * Uses a static flag to avoid re-initializing on multiple event calls.
+     */
+    private function initializeFlagship(): void
+    {
+        if (self::$flagshipInitialized) {
+            return;
+        }
+
+        Flagship::start(
+            FLAGSHIP_ENV_ID,
+            FLAGSHIP_API_KEY,
+            FlagshipConfig::decisionApi()
+                ->setLogLevel(LogLevel::ERROR)
+                ->setHitCacheImplementation(new HitCacheRedis())
+                ->setCacheStrategy(CacheStrategy::BATCHING_AND_CACHING_ON_FAILURE)
+        );
+
+        self::$flagshipInitialized = true;
+    }
+
+    /**
+     * Sends a hit to Flagship using the PHP SDK.
+     * Flagship::close() is NOT called here — it is handled by the shutdown function
+     * registered in ab-test-flagship.php, which batches all hits at the end of the request.
      *
      * @param string $visitorId
      * @param string $eventName
@@ -134,14 +167,7 @@ class EventEndpoint
         }
 
         try {
-            Flagship::start(
-                FLAGSHIP_ENV_ID,
-                FLAGSHIP_API_KEY,
-                FlagshipConfig::decisionApi()
-                    ->setLogLevel(LogLevel::ERROR)
-                    ->setHitCacheImplementation(new HitCacheRedis())
-                    ->setCacheStrategy(CacheStrategy::BATCHING_AND_CACHING_ON_FAILURE)
-            );
+            $this->initializeFlagship();
 
             $visitor = Flagship::newVisitor($visitorId, true)->build();
             $visitor->fetchFlags();
@@ -152,9 +178,7 @@ class EventEndpoint
                     ->setValue(1)
             );
 
-            Flagship::close();
-
-            error_log("[AB Test] Hit sent to Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
+            error_log("[AB Test] Hit queued for Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
 
             return ['success' => true, 'message' => 'Hit sent successfully.'];
         } catch (\Exception $e) {

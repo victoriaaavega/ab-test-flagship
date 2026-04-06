@@ -9,6 +9,9 @@ use Flagship\Cache\IHitCacheImplementation;
 /**
  * Redis implementation of Flagship's hit cache.
  * Stores failed hits and retries them automatically when Flagship::close() is called.
+ *
+ * Uses Redis DB index 1, separate from the variant cache in DB index 0.
+ * Uses SCAN instead of KEYS to avoid blocking Redis during lookups.
  */
 class HitCacheRedis implements IHitCacheImplementation {
 
@@ -16,8 +19,9 @@ class HitCacheRedis implements IHitCacheImplementation {
     private const REDIS_PORT    = 6379;
     private const REDIS_TIMEOUT = 0.05; // 50ms
     private const REDIS_DB      = 1;    // separate DB index from variant cache
+    private const SCAN_COUNT    = 100;  // keys to fetch per SCAN iteration
 
-    private ?Redis $redis = null;
+    private ?Redis $redis   = null;
     private bool $available = true;
 
     public function __construct() {
@@ -25,7 +29,8 @@ class HitCacheRedis implements IHitCacheImplementation {
     }
 
     /**
-     * Connects to Redis safely
+     * Connects to Redis safely. Marks as unavailable on failure
+     * so all subsequent calls are no-ops without retrying.
      */
     private function connect(): void {
         try {
@@ -40,9 +45,10 @@ class HitCacheRedis implements IHitCacheImplementation {
     }
 
     /**
-     * Caches hits that failed to send
+     * Caches hits that failed to send to Flagship.
+     * Called automatically by the SDK when a hit cannot be delivered.
      *
-     * @param array $hits
+     * @param array $hits Associative array of hit key => hit data
      */
     public function cacheHit(array $hits): void {
         if (!$this->available || $this->redis === null) {
@@ -61,9 +67,10 @@ class HitCacheRedis implements IHitCacheImplementation {
     }
 
     /**
-     * Loads all cached hits to retry sending them
+     * Loads all cached hits so the SDK can retry sending them.
+     * Uses SCAN instead of KEYS to avoid blocking Redis on large datasets.
      *
-     * @return array
+     * @return array Associative array of hit key => hit data
      */
     public function lookupHits(): array {
         if (!$this->available || $this->redis === null) {
@@ -71,7 +78,16 @@ class HitCacheRedis implements IHitCacheImplementation {
         }
 
         try {
-            $keys = $this->redis->keys('*');
+            $keys   = [];
+            $cursor = null;
+
+            // SCAN iterates in batches — safe for production unlike KEYS which blocks
+            do {
+                $batch = $this->redis->scan($cursor, '*', self::SCAN_COUNT);
+                if ($batch !== false && !empty($batch)) {
+                    $keys = array_merge($keys, $batch);
+                }
+            } while ($cursor !== 0 && $cursor !== null);
 
             if (empty($keys)) {
                 return [];
@@ -97,9 +113,9 @@ class HitCacheRedis implements IHitCacheImplementation {
     }
 
     /**
-     * Deletes specific hits from cache after they were sent successfully
+     * Deletes specific hits from cache after they were sent successfully.
      *
-     * @param array $hitKeys
+     * @param array $hitKeys List of Redis keys to delete
      */
     public function flushHits(array $hitKeys): void {
         if (!$this->available || $this->redis === null || empty($hitKeys)) {
@@ -114,7 +130,7 @@ class HitCacheRedis implements IHitCacheImplementation {
     }
 
     /**
-     * Deletes all cached hits
+     * Deletes all cached hits from this Redis DB.
      */
     public function flushAllHits(): void {
         if (!$this->available || $this->redis === null) {

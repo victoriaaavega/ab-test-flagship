@@ -10,7 +10,8 @@
 
     /**
      * Sends a hit event to the WordPress REST API endpoint.
-     * Retries up to 3 times if the request fails.
+     * Retries up to 3 times if the request fails with a server error (5xx).
+     * Does not retry on client errors (4xx) since those won't succeed on retry.
      *
      * @param {string} experimentId
      * @param {string} eventName
@@ -18,9 +19,9 @@
      * @param {number} attempt
      */
     function sendHit(experimentId, eventName, variant, attempt = 1) {
-        const MAX_ATTEMPTS    = 3;
-        const RETRY_DELAY_MS  = 1000;
-        const { visitorId }   = window.abTestData;
+        const MAX_ATTEMPTS   = 3;
+        const RETRY_DELAY_MS = 1000;
+        const { visitorId }  = window.abTestData;
         const { apiUrl, nonce } = window.abtfConfig;
 
         fetch(apiUrl, {
@@ -37,8 +38,9 @@
             })
         })
         .then(function (response) {
-            if (!response.ok) {
-                throw new Error('Server responded with status: ' + response.status);
+            // Only retry on server errors (5xx). Client errors (4xx) won't succeed on retry.
+            if (response.status >= 500) {
+                throw new Error('Server error: ' + response.status);
             }
             return response.json();
         })
@@ -60,7 +62,7 @@
     }
 
     /**
-     * Registers event listeners for all experiments defined in window.abTestConfig
+     * Registers event listeners for all experiments defined in window.abTestConfig.
      */
     function registerListeners() {
         if (!window.abTestConfig || !window.abTestData || !window.abtfConfig) {
@@ -76,7 +78,15 @@
                 return;
             }
 
-            const variant   = window.abTestData.experiments[config.experimentId];
+            const variant = window.abTestData.experiments[config.experimentId];
+
+            // Guard: if the experiment ID is not in abTestData, skip registering the listener.
+            // This prevents sending hits with an undefined variant.
+            if (variant === undefined || variant === null) {
+                console.warn('[AB Test] Variant not found for experiment:', config.experimentId);
+                return;
+            }
+
             const eventType = config.type || 'click';
 
             element.addEventListener(eventType, function () {
@@ -84,7 +94,7 @@
                 sendHit(config.experimentId, config.eventName, variant);
             });
 
-            console.log('[AB Test] Listener registered for:', config.selector);
+            console.log('[AB Test] Listener registered for:', config.selector, '| experiment:', config.experimentId, '| variant:', variant);
         });
     }
 
