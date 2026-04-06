@@ -1,5 +1,9 @@
 <?php
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 require_once ABTF_PLUGIN_DIR . 'vendor/autoload.php';
 
 use Flagship\Flagship;
@@ -7,39 +11,47 @@ use Flagship\Config\FlagshipConfig;
 use Flagship\Enum\LogLevel;
 use Flagship\Enum\CacheStrategy;
 
-if (class_exists('FlagshipAdapter')) {
-    return;
-}
-
+/**
+ * Flagship SDK implementation of the decision adapter.
+ * Connects to AB Tasty Flagship API to decide which variant a visitor should see.
+ * Requires FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY constants defined in wp-config.php.
+ */
 class FlagshipAdapter implements DecisionAdapterInterface {
 
     private static bool $initialized = false;
 
     /**
-     * Initializes the Flagship SDK once per request
+     * Initializes the Flagship SDK once per request.
+     * Checks for credentials before attempting to start the SDK.
      */
     private function initialize(): void {
-    if (self::$initialized) {
-        return;
+        if (self::$initialized) {
+            return;
+        }
+
+        if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {
+            error_log('[AB Test] FlagshipAdapter: credentials not found. Define FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY in wp-config.php.');
+            return;
+        }
+
+        Flagship::start(
+            FLAGSHIP_ENV_ID,
+            FLAGSHIP_API_KEY,
+            FlagshipConfig::decisionApi()
+                ->setLogLevel(LogLevel::ERROR)
+                ->setHitCacheImplementation(new HitCacheRedis())
+                ->setCacheStrategy(CacheStrategy::BATCHING_AND_CACHING_ON_FAILURE)
+        );
+
+        self::$initialized = true;
     }
 
-    Flagship::start(
-        FLAGSHIP_ENV_ID,
-        FLAGSHIP_API_KEY,
-        FlagshipConfig::decisionApi()
-            ->setLogLevel(LogLevel::ERROR)
-            ->setHitCacheImplementation(new HitCacheRedis())
-            ->setCacheStrategy(CacheStrategy::BATCHING_AND_CACHING_ON_FAILURE)
-    );
-
-    self::$initialized = true;
-}
-
     /**
-     * Decides which variant a visitor should see
+     * Decides which variant a visitor should see using Flagship SDK.
+     * Returns 'control' if the flag is not found or if an error occurs.
      *
-     * @param string $visitorId
-     * @param string $experimentId
+     * @param string $visitorId    Unique visitor identifier from fingerprinting
+     * @param string $experimentId Flag key as defined in Flagship dashboard
      * @return string
      */
     public function decide(string $visitorId, string $experimentId): string {
@@ -60,10 +72,10 @@ class FlagshipAdapter implements DecisionAdapterInterface {
 
             error_log("[AB Test] Flagship decision for '{$experimentId}': {$value}");
 
-            return $value;
+            return (string) $value;
 
         } catch (\Exception $e) {
-            error_log("[AB Test] Flagship error: " . $e->getMessage() . ". Serving control.");
+            error_log('[AB Test] Flagship error: ' . $e->getMessage() . '. Serving control.');
             return 'control';
         }
     }

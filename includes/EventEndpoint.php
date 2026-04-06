@@ -107,19 +107,15 @@ class EventEndpoint
         $result = $this->sendHitToFlagship($visitorId, $eventName, $variant);
 
         if (!$result['success']) {
+            // In development, missing credentials is expected — respond 200 so JS does not retry.
+            // In production with real credentials, this branch should never be reached.
+            $statusCode = str_contains($result['message'], 'credentials') ? 200 : 500;
+
             return new WP_REST_Response([
                 'success' => false,
                 'message' => $result['message'],
-            ], 500);
+            ], $statusCode);
         }
-
-        return new WP_REST_Response([
-            'success'    => true,
-            'message'    => 'Hit sent successfully.',
-            'experiment' => $experimentId,
-            'event'      => $eventName,
-            'variant'    => $variant,
-        ], 200);
     }
 
     /**
