@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AB Test Flagship
  * Description: Server-side A/B testing using AB Tasty Flagship SDK
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Victoria Vega
  * Requires PHP: 8.1
  */
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ABTF_VERSION', '1.0.0');
+define('ABTF_VERSION', '1.1.0');
 define('ABTF_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ABTF_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -102,7 +102,15 @@ function abtf_init(): void {
 }
 add_action('init', 'abtf_init');
 
+/**
+ * Sends all queued Flagship hits at the end of the request.
+ * Only runs if Flagship credentials are configured — no-op otherwise.
+ */
 function abtf_shutdown(): void {
+    if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {
+        return;
+    }
+
     try {
         Flagship\Flagship::close();
     } catch (\Exception $e) {

@@ -4,8 +4,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-require_once ABTF_PLUGIN_DIR . 'vendor/autoload.php';
-
 use Flagship\Flagship;
 use Flagship\Config\FlagshipConfig;
 use Flagship\Enum\LogLevel;
