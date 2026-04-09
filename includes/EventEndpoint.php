@@ -20,9 +20,11 @@ use Flagship\Enum\CacheStrategy;
 class EventEndpoint
 {
     private static bool $flagshipInitialized = false;
+    private RateLimiter $rateLimiter;
 
     public function __construct()
     {
+        $this->rateLimiter = new RateLimiter();
         add_action('rest_api_init', [$this, 'registerRoute']);
     }
 
@@ -62,13 +64,19 @@ class EventEndpoint
     }
 
     /**
-     * Validates that the request comes from the site using a WordPress nonce.
+     * Validates that the request comes from the site using a WordPress nonce,
+     * and that the client IP has not exceeded the rate limit.
+     *
+     * Order matters:
+     *   1. Check nonce first — cheapest check, no Redis call needed if it fails.
+     *   2. Check rate limit only if nonce is valid — avoids counting bot requests.
      *
      * @param WP_REST_Request $request
      * @return bool|WP_Error
      */
     public function validateRequest(WP_REST_Request $request): bool|WP_Error
     {
+        // Step 1: validate nonce
         $nonce = $request->get_header('X-ABTF-Nonce');
 
         if (empty($nonce)) {
@@ -84,6 +92,17 @@ class EventEndpoint
                 'invalid_nonce',
                 'Invalid or expired nonce.',
                 ['status' => 403]
+            );
+        }
+
+        // Step 2: check rate limit (only for requests that passed nonce validation)
+        $ip = $this->getClientIp();
+
+        if (!$this->rateLimiter->isAllowed($ip)) {
+            return new WP_Error(
+                'rate_limit_exceeded',
+                'Too many requests. Please slow down.',
+                ['status' => 429]
             );
         }
 
@@ -185,6 +204,42 @@ class EventEndpoint
             error_log('[AB Test] Flagship hit error: ' . $e->getMessage());
             return ['success' => false, 'message' => 'Failed to send hit to Flagship.'];
         }
+    }
+
+    /**
+     * Gets the real client IP respecting Cloudflare and common proxies.
+     * Mirrors the logic in Fingerprint.php.
+     *
+     * @return string
+     */
+    private function getClientIp(): string {
+        $headers = [
+            'HTTP_CF_CONNECTING_IP',
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_REAL_IP',
+            'REMOTE_ADDR',
+        ];
+
+        foreach ($headers as $header) {
+            if (!empty($_SERVER[$header])) {
+                $ip = trim(explode(',', $_SERVER[$header])[0]);
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    return $ip;
+                }
+            }
+        }
+
+        // Fallback: accept private IPs for local development
+        foreach ($headers as $header) {
+            if (!empty($_SERVER[$header])) {
+                $ip = trim(explode(',', $_SERVER[$header])[0]);
+                if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip;
+                }
+            }
+        }
+
+        return '0.0.0.0';
     }
 }
 
