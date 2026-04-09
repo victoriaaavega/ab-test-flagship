@@ -28,6 +28,22 @@ require_once ABTF_PLUGIN_DIR . 'includes/RateLimiter.php';
 require_once ABTF_PLUGIN_DIR . 'includes/EventEndpoint.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/MetaBox.php';
 
+/**
+ * Creates a nonce in a user-0 context so it can be verified
+ * in REST API requests, which WordPress treats as unauthenticated
+ * unless X-WP-Nonce is also present.
+ *
+ * @param string $action
+ * @return string
+ */
+function abtf_create_public_nonce(string $action): string {
+    $saved_user_id = get_current_user_id();
+    wp_set_current_user(0);
+    $nonce = wp_create_nonce($action);
+    wp_set_current_user($saved_user_id);
+    return $nonce;
+}
+
 function abtf_enqueue_scripts(): void {
     if (is_admin()) {
         return;
@@ -51,7 +67,7 @@ function abtf_enqueue_scripts(): void {
 
     wp_localize_script('abtf-event-tracker', 'abtfConfig', [
         'apiUrl' => rest_url('abtest/v1/event'),
-        'nonce'  => wp_create_nonce('abtf_track_event'),
+        'nonce'  => abtf_create_public_nonce('abtf_track_event'),
     ]);
 }
 add_action('wp_enqueue_scripts', 'abtf_enqueue_scripts');

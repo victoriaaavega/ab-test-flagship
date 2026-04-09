@@ -45,7 +45,7 @@
                 return response.json();
             })
             .then(function (data) {
-                if (data.success === false) {
+                if (data.success === false || data.code) {
                     console.warn('[AB Test] Hit rejected by server:', data.message);
                     return;
                 }
