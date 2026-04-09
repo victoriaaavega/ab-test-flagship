@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-04-08
+
+### Added
+- RateLimiter class using Redis DB 2 to cap requests per IP at 20/minute
+- Atomic increment + TTL via Lua script in RateLimiter to prevent race conditions
+- Rate limit check in EventEndpoint::validateRequest() after nonce validation — returns 429 on exceeded limit
+- Fail-open behavior in RateLimiter when Redis is unavailable — real users are never blocked by a cache outage
+- IP hashing (SHA256) in RateLimiter — raw IPs are never stored in Redis
+- getClientIp() method in EventEndpoint — mirrors Fingerprint.php logic for Cloudflare + proxy support
+- Static cache in RateLimiter to prevent double-counting caused by WordPress calling permission_callback multiple times per request
+
+### Fixed
+- event-tracker.js now logs a warning instead of "Hit sent" when the server rejects a request (e.g. 429)
+
 ## [1.1.0] - 2026-04-06
 
 ### Fixed
