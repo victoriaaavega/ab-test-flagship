@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-04-09
+
+### Fixed
+- Static cache added to RateLimiter to prevent double-counting — WordPress
+  calls permission_callback more than once per request internally, which
+  was incrementing the Redis counter twice per hit and halving the effective limit
+- Nonce verification failing with 403 for logged-in users — added
+  abtf_create_public_nonce() to generate nonces in user-0 context so
+  wp_verify_nonce() works correctly in REST API requests regardless of
+  authentication state. Discovered during portability test with test-portability theme.
+- event-tracker.js now correctly identifies WordPress error responses
+  using data.code check in addition to data.success === false — WordPress
+  REST API errors use {code, message} structure, causing rejections to
+  log as "Hit sent" instead of "Hit rejected by server".
+  Discovered during nonce expiry test.
+
+### Tested
+- Fallback to database with Redis down — variants served correctly, no visible errors
+- Two simultaneous experiments on the same page — each decides independently
+- Nonce expiry — 403 handled correctly with no retries
+- New vs returning visitor with Redis active — returning visitor served from Redis without calling Flagship
+- SimulatorAdapter without credentials — deterministic bucketing, admin notice shown, hits rejected cleanly
+- Endpoint security from outside — 401 missing nonce, 403 invalid nonce, 400 invalid params
+- Concurrent load with k6 — 10 virtual users, 40s, zero 500 errors, rate limiter triggered correctly
+
 ## [1.2.0] - 2026-04-08
 
 ### Added
