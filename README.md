@@ -21,7 +21,7 @@ Heap syncs Visitor ID via cookie
       ↓
 User clicks
       ↓
-JS sends POST to REST API endpoint (with nonce)
+JS sends POST to REST API endpoint
       ↓
 PHP validates nonce + rate limit → forwards hit to Flagship
 ```
@@ -59,10 +59,6 @@ composer install
 define('FLAGSHIP_ENV_ID', 'your_env_id');
 define('FLAGSHIP_API_KEY', 'your_api_key');
 ```
-
-These values are found in your Flagship dashboard under **Environment settings**.
-
-> ⚠️ Never commit `wp-config.php` to Git. It is already excluded in `.gitignore`.
 
 **4. Activate the plugin** from the WordPress admin under **Plugins**.
 
@@ -217,7 +213,7 @@ ab-test-flagship/
 ├── vendor/                                ← Flagship SDK (not in Git)
 ├── assets/
 │   └── js/
-│       ├── event-tracker.js               ← captures events and sends hits (with retry)
+│       ├── event-tracker.js               ← captures events and sends hits
 │       └── heap-sync.js                   ← syncs Visitor ID with Heap Analytics
 └── includes/
     ├── Fingerprint.php                    ← generates Visitor ID
@@ -231,40 +227,12 @@ ab-test-flagship/
     │   └── MetaBox.php                    ← admin dashboard widget with experiment stats
     └── adapters/
         ├── DecisionAdapterInterface.php   ← contract for any decision engine
-        ├── SimulatorAdapter.php           ← local 50/50 bucketing (no network calls)
+        ├── SimulatorAdapter.php           ← local 50/50 bucketing
         └── FlagshipAdapter.php            ← AB Tasty Flagship SDK integration
 ```
-
----
-
-## Production checklist (Kinsta)
-
-Before deploying to production:
-
-- [ ] Confirm `phpredis` extension is enabled in Kinsta
-- [ ] Add `FLAGSHIP_ENV_ID` and `FLAGSHIP_API_KEY` to the production `wp-config.php`
-- [ ] Configure an Nginx cache bypass rule for pages running experiments — coordinate with Kinsta support
-- [ ] Verify Heap `identify()` is being called correctly in production with the `heap_visitor_id` cookie
 
 ---
 
 ## Dashboard widget
 
 The plugin adds an **AB Test — Experiments** widget to the WordPress admin dashboard showing visitor counts and percentages per variant for each experiment, pulled from the database.
-
----
-
-## Security
-
-| Measure | What it protects |
-|---|---|
-| Nonce `abtf_track_event` (user-0 context) | Only the site can send hits to the endpoint |
-| Header `X-ABTF-Nonce` | Avoids conflicts with WordPress internal nonce handling |
-| SHA256 validation on `visitor_id` | Rejects malformed or malicious IDs |
-| `sanitize_text_field` on all fields | Strips malicious characters from inputs |
-| Length validation on all fields | Prevents extremely long inputs |
-| Rate limiting (20 req/min per IP) | Prevents hit flooding and metric contamination |
-| IP hashing in Redis | Raw IPs are never stored |
-| `ABSPATH` check in all PHP files | Prevents direct file access |
-| `esc_html()` in MetaBox | Prevents XSS in the admin dashboard |
-| Credentials in `wp-config.php` | Credentials never go in code or Git |
