@@ -5,38 +5,37 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Handles all database operations for AB test variant storage.
- * Used as fallback when Redis is unavailable.
+ * Handles all database operations for AB test variant storage
+ * and experiment configurations.
  */
 class Database {
 
-    private const TABLE_VERSION = '1.0';
+    // Subimos la versión para que wp_options detecte el cambio y ejecute dbDelta
+    private const TABLE_VERSION = '1.1';
 
     /**
-     * Creates the assignments table only if it hasn't been created yet
+     * Creates the required tables only if they haven't been created yet
      */
     public function maybeCreateTable(): void {
         if (get_option('ab_test_table_version') === self::TABLE_VERSION) {
             return;
         }
 
-        $this->createTable();
+        $this->createAssignmentsTable();
+        $this->createExperimentsTable();
+        
         update_option('ab_test_table_version', self::TABLE_VERSION);
     }
 
     /**
      * Retrieves the assigned variant for a visitor and experiment
-     *
-     * @param string $experimentId
-     * @param string $visitorId
-     * @return string|null
      */
     public function getVariant(string $experimentId, string $visitorId): ?string {
         global $wpdb;
 
         $result = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT variant FROM {$this->getTableName()} WHERE experiment_id = %s AND visitor_id = %s LIMIT 1",
+                "SELECT variant FROM {$this->getAssignmentsTableName()} WHERE experiment_id = %s AND visitor_id = %s LIMIT 1",
                 $experimentId,
                 $visitorId
             )
@@ -47,19 +46,13 @@ class Database {
 
     /**
      * Saves the assigned variant for a visitor and experiment.
-     * Uses INSERT IGNORE to avoid duplicates on race conditions.
-     *
-     * @param string $experimentId
-     * @param string $visitorId
-     * @param string $variant
-     * @return bool
      */
     public function saveVariant(string $experimentId, string $visitorId, string $variant): bool {
         global $wpdb;
 
         $result = $wpdb->query(
             $wpdb->prepare(
-                "INSERT IGNORE INTO {$this->getTableName()} (experiment_id, visitor_id, variant) VALUES (%s, %s, %s)",
+                "INSERT IGNORE INTO {$this->getAssignmentsTableName()} (experiment_id, visitor_id, variant) VALUES (%s, %s, %s)",
                 $experimentId,
                 $visitorId,
                 $variant
@@ -69,24 +62,26 @@ class Database {
         return $result !== false;
     }
 
-    /**
-     * Returns the full table name including WordPress prefix
-     *
-     * @return string
-     */
-    private function getTableName(): string {
+    private function getAssignmentsTableName(): string {
         global $wpdb;
         return $wpdb->prefix . 'ab_test_assignments';
     }
 
+    private function getExperimentsTableName(): string {
+        global $wpdb;
+        return $wpdb->prefix . 'ab_test_experiments';
+    }
+
     /**
-     * Creates the assignments table using WordPress dbDelta()
+     * Creates the assignments table
      */
-    private function createTable(): void {
+    private function createAssignmentsTable(): void {
         global $wpdb;
 
         $charset = $wpdb->get_charset_collate();
-        $sql     = "CREATE TABLE {$this->getTableName()} (
+        $tableName = $this->getAssignmentsTableName();
+        
+        $sql = "CREATE TABLE {$tableName} (
             id            BIGINT(20)   NOT NULL AUTO_INCREMENT,
             experiment_id VARCHAR(100) NOT NULL,
             visitor_id    VARCHAR(64)  NOT NULL,
@@ -99,6 +94,36 @@ class Database {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
-        error_log('[AB Test] Table ' . $this->getTableName() . ' created or already exists.');
+        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+    }
+
+    /**
+     * Creates the experiments table for the CRUD Admin UI
+     */
+    private function createExperimentsTable(): void {
+        global $wpdb;
+
+        $charset = $wpdb->get_charset_collate();
+        $tableName = $this->getExperimentsTableName();
+        
+        $sql = "CREATE TABLE {$tableName} (
+            id            BIGINT(20)   NOT NULL AUTO_INCREMENT,
+            flag_key      VARCHAR(100) NOT NULL,
+            name          VARCHAR(255) NOT NULL,
+            selector      VARCHAR(255) NOT NULL,
+            event_name    VARCHAR(100) NOT NULL,
+            event_type    VARCHAR(50)  DEFAULT 'click' NOT NULL,
+            urls          TEXT         NOT NULL,
+            status        VARCHAR(20)  DEFAULT 'active' NOT NULL,
+            created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY flag_key (flag_key)
+        ) {$charset};";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta($sql);
+
+        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
     }
 }

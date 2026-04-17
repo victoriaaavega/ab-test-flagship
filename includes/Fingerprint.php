@@ -46,7 +46,6 @@ class Fingerprint {
             }
         }
 
-        // Fallback: accept private IPs for local development
         foreach ($headers as $header) {
             if (!empty($_SERVER[$header])) {
                 $ip = trim(explode(',', $_SERVER[$header])[0]);

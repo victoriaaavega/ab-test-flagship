@@ -9,17 +9,14 @@ use Flagship\Cache\IHitCacheImplementation;
 /**
  * Redis implementation of Flagship's hit cache.
  * Stores failed hits and retries them automatically when Flagship::close() is called.
- *
- * Uses Redis DB index 1, separate from the variant cache in DB index 0.
- * Uses SCAN instead of KEYS to avoid blocking Redis during lookups.
  */
 class HitCacheRedis implements IHitCacheImplementation {
 
     private const REDIS_HOST    = '127.0.0.1';
     private const REDIS_PORT    = 6379;
-    private const REDIS_TIMEOUT = 0.05; // 50ms
-    private const REDIS_DB      = 1;    // separate DB index from variant cache
-    private const SCAN_COUNT    = 100;  // keys to fetch per SCAN iteration
+    private const REDIS_TIMEOUT = 0.05;
+    private const REDIS_DB      = 1;
+    private const SCAN_COUNT    = 100;
 
     private ?Redis $redis   = null;
     private bool $available = true;
@@ -81,7 +78,6 @@ class HitCacheRedis implements IHitCacheImplementation {
             $keys   = [];
             $cursor = null;
 
-            // SCAN iterates in batches — safe for production unlike KEYS which blocks
             do {
                 $batch = $this->redis->scan($cursor, '*', self::SCAN_COUNT);
                 if ($batch !== false && !empty($batch)) {

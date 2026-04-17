@@ -10,8 +10,7 @@
 
     /**
      * Sends a hit event to the WordPress REST API endpoint.
-     * Retries up to 3 times if the request fails with a server error (5xx).
-     * Does not retry on client errors (4xx) since those won't succeed on retry.
+     * Retries up to 3 times if the request fails with a server error.
      *
      * @param {string} experimentId
      * @param {string} eventName
@@ -38,7 +37,6 @@
             })
         })
             .then(function (response) {
-                // Only retry on server errors (5xx). Client errors (4xx) won't succeed on retry.
                 if (response.status >= 500) {
                     throw new Error('Server error: ' + response.status);
                 }
@@ -84,8 +82,7 @@
 
             const variant = window.abTestData.experiments[config.experimentId];
 
-            // Guard: if the experiment ID is not in abTestData, skip registering the listener.
-            // This prevents sending hits with an undefined variant.
+            // If the experiment ID is not in abTestData, skip registering the listener.
             if (variant === undefined || variant === null) {
                 console.warn('[AB Test] Variant not found for experiment:', config.experimentId);
                 return;

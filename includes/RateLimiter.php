@@ -7,16 +7,13 @@ if (!defined('ABSPATH')) {
 /**
  * Rate limiter for the AB Test event endpoint.
  * Uses Redis to track request counts per IP within a fixed time window.
- *
- * If Redis is unavailable, the limiter fails open (allows the request)
- * to avoid blocking real users when the cache layer is down.
  */
 class RateLimiter {
 
     private const REDIS_HOST     = '127.0.0.1';
     private const REDIS_PORT     = 6379;
-    private const REDIS_TIMEOUT  = 0.05; // 50ms
-    private const REDIS_DB       = 2;    // separate DB index from variants (0) and hit cache (1)
+    private const REDIS_TIMEOUT  = 0.05;
+    private const REDIS_DB       = 2;
 
     private const MAX_REQUESTS   = 20;   // maximum requests allowed per window
     private const WINDOW_SECONDS = 60;   // rolling window duration in seconds
@@ -27,8 +24,7 @@ class RateLimiter {
     private static array $cache = []; // stores result per IP for the current request
 
     /**
-     * Lua script for atomic increment + expiry.
-     * Increments the counter and sets TTL only on the first hit,
+     * Lua script that increments the counter and sets TTL only on the first hit,
      * so the window always starts from the first request.
      * Returns the current count after incrementing.
      */
@@ -57,14 +53,11 @@ class RateLimiter {
     public function isAllowed(string $ip): bool {
         $hash = $this->hashIp($ip);
 
-        // If we already checked this IP in the current request, return cached result.
-        // WordPress can call permission_callback multiple times per request internally.
         if (isset(self::$cache[$hash])) {
             return self::$cache[$hash];
         }
 
         if (!$this->available || $this->redis === null) {
-            // Fail open: if Redis is down, allow the request rather than block real users.
             error_log('[AB Test] RateLimiter: Redis unavailable, failing open.');
             return true;
         }
@@ -74,7 +67,7 @@ class RateLimiter {
             $count = $this->redis->eval(
                 self::LUA_SCRIPT,
                 [$key, (string) self::WINDOW_SECONDS],
-                1 // number of keys
+                1
             );
 
             if ($count === false) {

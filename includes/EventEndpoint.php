@@ -67,16 +67,12 @@ class EventEndpoint
      * Validates that the request comes from the site using a WordPress nonce,
      * and that the client IP has not exceeded the rate limit.
      *
-     * Order matters:
-     *   1. Check nonce first — cheapest check, no Redis call needed if it fails.
-     *   2. Check rate limit only if nonce is valid — avoids counting bot requests.
-     *
      * @param WP_REST_Request $request
      * @return bool|WP_Error
      */
     public function validateRequest(WP_REST_Request $request): bool|WP_Error
     {
-        // Step 1: validate nonce
+        // Validate nonce
         $nonce = $request->get_header('X-ABTF-Nonce');
 
         if (empty($nonce)) {
@@ -95,7 +91,7 @@ class EventEndpoint
             );
         }
 
-        // Step 2: check rate limit (only for requests that passed nonce validation)
+        // Check rate limit
         $ip = $this->getClientIp();
 
         if (!$this->rateLimiter->isAllowed($ip)) {
@@ -127,8 +123,6 @@ class EventEndpoint
         $result = $this->sendHitToFlagship($visitorId, $eventName, $variant);
 
         if (!$result['success']) {
-            // In development, missing credentials is expected — respond 200 so JS does not retry.
-            // Any other failure is a real server error and returns 500.
             $statusCode = str_contains($result['message'], 'credentials') ? 200 : 500;
 
             return new WP_REST_Response([
@@ -148,7 +142,6 @@ class EventEndpoint
 
     /**
      * Initializes the Flagship SDK once per request lifecycle.
-     * Uses a static flag to avoid re-initializing on multiple event calls.
      */
     private function initializeFlagship(): void
     {
@@ -208,7 +201,6 @@ class EventEndpoint
 
     /**
      * Gets the real client IP respecting Cloudflare and common proxies.
-     * Mirrors the logic in Fingerprint.php.
      *
      * @return string
      */
@@ -229,7 +221,6 @@ class EventEndpoint
             }
         }
 
-        // Fallback: accept private IPs for local development
         foreach ($headers as $header) {
             if (!empty($_SERVER[$header])) {
                 $ip = trim(explode(',', $_SERVER[$header])[0]);
