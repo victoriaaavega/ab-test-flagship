@@ -233,5 +233,3 @@ class EventEndpoint
         return '0.0.0.0';
     }
 }
-
-new EventEndpoint();

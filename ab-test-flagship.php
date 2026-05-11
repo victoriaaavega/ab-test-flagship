@@ -40,8 +40,12 @@ require_once ABTF_PLUGIN_DIR . 'includes/AutoInjector.php';
 // -----------------------------------------------------------------------------
 
 add_action('plugins_loaded', function (): void {
-    // Admin UI: experiments CRUD page
+    // REST API endpoint
+    new EventEndpoint();
+
+    // Admin UI
     if (is_admin()) {
+        new MetaBox();
         new ExperimentsPage();
     }
 });

@@ -26,8 +26,8 @@ class ExperimentsPage {
     private string $tableName = '';
 
     public function __construct() {
-        add_action('admin_menu',   [$this, 'addMenuPage']);
-        add_action('admin_init',   [$this, 'handleWrites']);
+        add_action('admin_menu',    [$this, 'addMenuPage']);
+        add_action('admin_init',    [$this, 'handleWrites']);
         add_action('admin_notices', [$this, 'renderNotice']);
     }
 
@@ -336,9 +336,15 @@ class ExperimentsPage {
             "SELECT * FROM {$this->table()} ORDER BY created_at DESC"
         );
 
+        $addNewUrl = add_query_arg(
+            ['page' => $this->menuSlug],
+            admin_url('admin.php')
+        ) . '#abtf-add-new';
+
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline">AB Test — Experiments</h1>
+            <a href="<?php echo esc_url($addNewUrl); ?>" class="page-title-action">Add New</a>
             <hr class="wp-header-end">
 
             <table class="wp-list-table widefat fixed striped table-view-list" style="margin-top: 16px;">
@@ -519,7 +525,7 @@ class ExperimentsPage {
 
     private function renderCreateForm(): void {
         ?>
-        <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 800px;">
+        <div id="abtf-add-new" style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 800px;">
             <h2 style="margin-top: 0;">Add New Experiment</h2>
             <form method="post" action="">
                 <?php wp_nonce_field('abtf_create_experiment'); ?>

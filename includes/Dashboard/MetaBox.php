@@ -72,5 +72,3 @@ class MetaBox
         echo '</tbody></table>';
     }
 }
-
-new MetaBox();

@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
  */
 class Database {
 
-    // Subimos la versión para que wp_options detecte el cambio y ejecute dbDelta
+    // Bump version to trigger dbDelta on schema changes
     private const TABLE_VERSION = '1.1';
 
     /**
@@ -78,7 +78,7 @@ class Database {
     private function createAssignmentsTable(): void {
         global $wpdb;
 
-        $charset = $wpdb->get_charset_collate();
+        $charset   = $wpdb->get_charset_collate();
         $tableName = $this->getAssignmentsTableName();
         
         $sql = "CREATE TABLE {$tableName} (
@@ -98,12 +98,12 @@ class Database {
     }
 
     /**
-     * Creates the experiments table for the CRUD Admin UI
+     * Creates the experiments table for the admin CRUD UI
      */
     private function createExperimentsTable(): void {
         global $wpdb;
 
-        $charset = $wpdb->get_charset_collate();
+        $charset   = $wpdb->get_charset_collate();
         $tableName = $this->getExperimentsTableName();
         
         $sql = "CREATE TABLE {$tableName} (
