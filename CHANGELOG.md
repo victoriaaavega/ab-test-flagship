@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-05-12
+
+### Added
+- StatsRebuildJob class — aggregates wp_ab_test_assignments into wp_ab_test_stats
+  using INSERT ... ON DUPLICATE KEY UPDATE to avoid empty-table windows during rebuild
+- CronManager class — registers a custom 8-hour WP-Cron interval and schedules
+  the abtf_rebuild_stats recurring event; unschedules cleanly on plugin deactivation
+- wp_ab_test_stats table — pre-calculated totals (experiment_id, variant, total,
+  last_rebuilt_at) with UNIQUE KEY on experiment_id + variant
+- "Rebuild Stats" button in AB Tests admin page — triggers StatsRebuildJob manually
+  without waiting for the next cron run
+- Plugin deactivation hook — calls CronManager::unschedule() to remove the cron
+  event from wp_cron on deactivation
+- ExperimentsPage and AutoInjector classes (Step 2, shipped with this version)
+
+### Changed
+- MetaBox now reads from wp_ab_test_stats instead of running COUNT(*) live on
+  wp_ab_test_assignments — eliminates slow queries at scale
+- MetaBox shows last_rebuilt_at timestamp so admins know how fresh the data is
+- Database TABLE_VERSION bumped to 1.2 to trigger creation of wp_ab_test_stats
+  on existing installs
+- cron_schedules filter registered at plugin load time (before plugins_loaded)
+  to guarantee the custom interval is available when wp_schedule_event() runs
+
 ## [1.2.1] - 2026-04-09
 
 ### Fixed
