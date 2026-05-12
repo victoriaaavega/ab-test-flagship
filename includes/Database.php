@@ -8,29 +8,33 @@ if (!defined('ABSPATH')) {
  * Handles all database operations for AB test variant storage
  * and experiment configurations.
  */
-class Database {
+class Database
+{
 
     // Bump version to trigger dbDelta on schema changes
-    private const TABLE_VERSION = '1.1';
+    private const TABLE_VERSION = '1.2';
 
     /**
      * Creates the required tables only if they haven't been created yet
      */
-    public function maybeCreateTable(): void {
+    public function maybeCreateTable(): void
+    {
         if (get_option('ab_test_table_version') === self::TABLE_VERSION) {
             return;
         }
 
         $this->createAssignmentsTable();
         $this->createExperimentsTable();
-        
+        $this->createStatsTable();
+
         update_option('ab_test_table_version', self::TABLE_VERSION);
     }
 
     /**
      * Retrieves the assigned variant for a visitor and experiment
      */
-    public function getVariant(string $experimentId, string $visitorId): ?string {
+    public function getVariant(string $experimentId, string $visitorId): ?string
+    {
         global $wpdb;
 
         $result = $wpdb->get_var(
@@ -47,7 +51,8 @@ class Database {
     /**
      * Saves the assigned variant for a visitor and experiment.
      */
-    public function saveVariant(string $experimentId, string $visitorId, string $variant): bool {
+    public function saveVariant(string $experimentId, string $visitorId, string $variant): bool
+    {
         global $wpdb;
 
         $result = $wpdb->query(
@@ -62,12 +67,14 @@ class Database {
         return $result !== false;
     }
 
-    private function getAssignmentsTableName(): string {
+    private function getAssignmentsTableName(): string
+    {
         global $wpdb;
         return $wpdb->prefix . 'ab_test_assignments';
     }
 
-    private function getExperimentsTableName(): string {
+    private function getExperimentsTableName(): string
+    {
         global $wpdb;
         return $wpdb->prefix . 'ab_test_experiments';
     }
@@ -75,12 +82,13 @@ class Database {
     /**
      * Creates the assignments table
      */
-    private function createAssignmentsTable(): void {
+    private function createAssignmentsTable(): void
+    {
         global $wpdb;
 
         $charset   = $wpdb->get_charset_collate();
         $tableName = $this->getAssignmentsTableName();
-        
+
         $sql = "CREATE TABLE {$tableName} (
             id            BIGINT(20)   NOT NULL AUTO_INCREMENT,
             experiment_id VARCHAR(100) NOT NULL,
@@ -100,12 +108,13 @@ class Database {
     /**
      * Creates the experiments table for the admin CRUD UI
      */
-    private function createExperimentsTable(): void {
+    private function createExperimentsTable(): void
+    {
         global $wpdb;
 
         $charset   = $wpdb->get_charset_collate();
         $tableName = $this->getExperimentsTableName();
-        
+
         $sql = "CREATE TABLE {$tableName} (
             id            BIGINT(20)   NOT NULL AUTO_INCREMENT,
             flag_key      VARCHAR(100) NOT NULL,
@@ -120,6 +129,33 @@ class Database {
             PRIMARY KEY (id),
             UNIQUE KEY flag_key (flag_key)
         ) {$charset};";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta($sql);
+
+        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+    }
+
+    /**
+     * Creates the stats table for pre-calculated experiment totals.
+     * The cron job writes here so MetaBox never runs COUNT(*) live.
+     */
+    private function createStatsTable(): void
+    {
+        global $wpdb;
+
+        $charset   = $wpdb->get_charset_collate();
+        $tableName = $wpdb->prefix . 'ab_test_stats';
+
+        $sql = "CREATE TABLE {$tableName} (
+        id                BIGINT(20)   NOT NULL AUTO_INCREMENT,
+        experiment_id     VARCHAR(100) NOT NULL,
+        variant           VARCHAR(100) NOT NULL,
+        total             BIGINT(20)   NOT NULL DEFAULT 0,
+        last_rebuilt_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY experiment_variant (experiment_id, variant)
+    ) {$charset};";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);

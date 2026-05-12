@@ -34,16 +34,28 @@ require_once ABTF_PLUGIN_DIR . 'includes/EventEndpoint.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/MetaBox.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/ExperimentsPage.php';
 require_once ABTF_PLUGIN_DIR . 'includes/AutoInjector.php';
+require_once ABTF_PLUGIN_DIR . 'includes/StatsRebuildJob.php';
+require_once ABTF_PLUGIN_DIR . 'includes/CronManager.php';
 
 // -----------------------------------------------------------------------------
 // Bootstrap — runs after all plugins are loaded
 // -----------------------------------------------------------------------------
 
+// Register the interval filter as early as possible, before WordPress
+// calls wp_get_schedules() internally during cron setup.
+add_filter('cron_schedules', function (array $schedules): array {
+    $schedules[CronManager::INTERVAL] = [
+        'interval' => 8 * HOUR_IN_SECONDS,
+        'display'  => 'Every 8 hours',
+    ];
+    return $schedules;
+});
+
+new CronManager();
+
 add_action('plugins_loaded', function (): void {
-    // REST API endpoint
     new EventEndpoint();
 
-    // Admin UI
     if (is_admin()) {
         new MetaBox();
         new ExperimentsPage();
@@ -152,6 +164,10 @@ add_action('init', 'abtf_init');
 // -----------------------------------------------------------------------------
 // Shutdown — flush Flagship hit queue
 // -----------------------------------------------------------------------------
+
+register_deactivation_hook(__FILE__, function (): void {
+    CronManager::unschedule();
+});
 
 function abtf_shutdown(): void {
     if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {

@@ -20,12 +20,14 @@ if (!defined('ABSPATH')) {
  *   - Passes feedback via ?abtf_notice=key&abtf_type=success|error in the URL
  *   - renderNotice() reads those params and prints the message via admin_notices
  */
-class ExperimentsPage {
+class ExperimentsPage
+{
 
     private string $menuSlug  = 'abtf-experiments';
     private string $tableName = '';
 
-    public function __construct() {
+    public function __construct()
+    {
         add_action('admin_menu',    [$this, 'addMenuPage']);
         add_action('admin_init',    [$this, 'handleWrites']);
         add_action('admin_notices', [$this, 'renderNotice']);
@@ -35,7 +37,8 @@ class ExperimentsPage {
     // Setup
     // -------------------------------------------------------------------------
 
-    private function table(): string {
+    private function table(): string
+    {
         if ($this->tableName === '') {
             global $wpdb;
             $this->tableName = $wpdb->prefix . 'ab_test_experiments';
@@ -43,7 +46,8 @@ class ExperimentsPage {
         return $this->tableName;
     }
 
-    private function requirePermission(): void {
+    private function requirePermission(): void
+    {
         if (!current_user_can('manage_options')) {
             wp_die(
                 esc_html__('You do not have permission to perform this action.'),
@@ -52,7 +56,8 @@ class ExperimentsPage {
         }
     }
 
-    public function addMenuPage(): void {
+    public function addMenuPage(): void
+    {
         add_menu_page(
             'AB Test Experiments',
             'AB Tests',
@@ -84,9 +89,12 @@ class ExperimentsPage {
         'invalid_id'    => 'Invalid experiment ID.',
         'not_found'     => 'Experiment not found.',
         'db_error'      => 'A database error occurred. Please try again.',
+        'stats_rebuilt' => 'Stats rebuilt successfully.',
+        'stats_error'   => 'Stats rebuild failed. Check error logs.',
     ];
 
-    private function redirectUrl(array $queryArgs, string $noticeKey, string $noticeType = 'success'): string {
+    private function redirectUrl(array $queryArgs, string $noticeKey, string $noticeType = 'success'): string
+    {
         return add_query_arg(
             array_merge($queryArgs, [
                 'page'        => $this->menuSlug,
@@ -97,7 +105,8 @@ class ExperimentsPage {
         );
     }
 
-    public function renderNotice(): void {
+    public function renderNotice(): void
+    {
         $screen = get_current_screen();
         if (!$screen || !str_contains($screen->id, $this->menuSlug)) {
             return;
@@ -129,7 +138,8 @@ class ExperimentsPage {
      * Runs on admin_init — before any HTML is sent to the browser.
      * Bails immediately if we are not on our own admin page.
      */
-    public function handleWrites(): void {
+    public function handleWrites(): void
+    {
         // Only act on our own page
         if (($_GET['page'] ?? '') !== $this->menuSlug) {
             return;
@@ -140,9 +150,10 @@ class ExperimentsPage {
             $postAction = sanitize_key($_POST['abtf_action'] ?? '');
 
             match ($postAction) {
-                'create' => $this->handleCreate(),
-                'update' => $this->handleUpdate(),
-                default  => null,
+                'create'         => $this->handleCreate(),
+                'update'         => $this->handleUpdate(),
+                'rebuild_stats'  => $this->handleRebuildStats(),
+                default          => null,
             };
             return;
         }
@@ -157,7 +168,8 @@ class ExperimentsPage {
         };
     }
 
-    private function validateFields(array $fields, int $maxLen = 255): bool {
+    private function validateFields(array $fields, int $maxLen = 255): bool
+    {
         foreach ($fields as $value) {
             $value = trim((string) $value);
             if ($value === '' || mb_strlen($value) > $maxLen) {
@@ -167,7 +179,8 @@ class ExperimentsPage {
         return true;
     }
 
-    private function handleCreate(): void {
+    private function handleCreate(): void
+    {
         global $wpdb;
 
         $this->requirePermission();
@@ -216,7 +229,8 @@ class ExperimentsPage {
         exit;
     }
 
-    private function handleUpdate(): void {
+    private function handleUpdate(): void
+    {
         global $wpdb;
 
         $id = intval($_POST['experiment_id'] ?? 0);
@@ -261,7 +275,8 @@ class ExperimentsPage {
         exit;
     }
 
-    private function handleToggle(): void {
+    private function handleToggle(): void
+    {
         global $wpdb;
 
         $id = intval($_GET['id'] ?? 0);
@@ -292,7 +307,8 @@ class ExperimentsPage {
         exit;
     }
 
-    private function handleDelete(): void {
+    private function handleDelete(): void
+    {
         global $wpdb;
 
         $id = intval($_GET['id'] ?? 0);
@@ -320,7 +336,8 @@ class ExperimentsPage {
      * Only handles GET renders — all writes have already been handled (or
      * redirected away) by handleWrites() on admin_init.
      */
-    public function renderPage(): void {
+    public function renderPage(): void
+    {
         $action = sanitize_key($_GET['action'] ?? '');
 
         match ($action) {
@@ -329,7 +346,8 @@ class ExperimentsPage {
         };
     }
 
-    private function renderList(): void {
+    private function renderList(): void
+    {
         global $wpdb;
 
         $experiments = $wpdb->get_results(
@@ -341,10 +359,17 @@ class ExperimentsPage {
             admin_url('admin.php')
         ) . '#abtf-add-new';
 
-        ?>
+?>
         <div class="wrap">
             <h1 class="wp-heading-inline">AB Test — Experiments</h1>
             <a href="<?php echo esc_url($addNewUrl); ?>" class="page-title-action">Add New</a>
+            <form method="post" style="display:inline;">
+                <?php wp_nonce_field('abtf_rebuild_stats'); ?>
+                <input type="hidden" name="abtf_action" value="rebuild_stats">
+                <button type="submit" class="page-title-action">
+                    ↺ Rebuild Stats
+                </button>
+            </form>
             <hr class="wp-header-end">
 
             <table class="wp-list-table widefat fixed striped table-view-list" style="margin-top: 16px;">
@@ -366,29 +391,29 @@ class ExperimentsPage {
                     <?php else: ?>
                         <?php foreach ($experiments as $exp): ?>
                             <?php
-                                $expId       = intval($exp->id);
-                                $isActive    = $exp->status === 'active';
-                                $toggleLabel = $isActive ? 'Pause' : 'Resume';
+                            $expId       = intval($exp->id);
+                            $isActive    = $exp->status === 'active';
+                            $toggleLabel = $isActive ? 'Pause' : 'Resume';
 
-                                $editUrl = add_query_arg([
-                                    'page'   => $this->menuSlug,
-                                    'action' => 'edit',
-                                    'id'     => $expId,
-                                ], admin_url('admin.php'));
+                            $editUrl = add_query_arg([
+                                'page'   => $this->menuSlug,
+                                'action' => 'edit',
+                                'id'     => $expId,
+                            ], admin_url('admin.php'));
 
-                                $toggleUrl = add_query_arg([
-                                    'page'     => $this->menuSlug,
-                                    'action'   => 'toggle',
-                                    'id'       => $expId,
-                                    '_wpnonce' => wp_create_nonce('abtf_toggle_' . $expId),
-                                ], admin_url('admin.php'));
+                            $toggleUrl = add_query_arg([
+                                'page'     => $this->menuSlug,
+                                'action'   => 'toggle',
+                                'id'       => $expId,
+                                '_wpnonce' => wp_create_nonce('abtf_toggle_' . $expId),
+                            ], admin_url('admin.php'));
 
-                                $deleteUrl = add_query_arg([
-                                    'page'     => $this->menuSlug,
-                                    'action'   => 'delete',
-                                    'id'       => $expId,
-                                    '_wpnonce' => wp_create_nonce('abtf_delete_' . $expId),
-                                ], admin_url('admin.php'));
+                            $deleteUrl = add_query_arg([
+                                'page'     => $this->menuSlug,
+                                'action'   => 'delete',
+                                'id'       => $expId,
+                                '_wpnonce' => wp_create_nonce('abtf_delete_' . $expId),
+                            ], admin_url('admin.php'));
                             ?>
                             <tr>
                                 <td><strong><?php echo esc_html($exp->name); ?></strong></td>
@@ -405,17 +430,17 @@ class ExperimentsPage {
                                 <td><?php echo $this->statusBadge($exp->status); ?></td>
                                 <td>
                                     <a href="<?php echo esc_url($editUrl); ?>"
-                                       class="button button-small">Edit</a>
+                                        class="button button-small">Edit</a>
                                     &nbsp;
                                     <a href="<?php echo esc_url($toggleUrl); ?>"
-                                       class="button button-small">
+                                        class="button button-small">
                                         <?php echo esc_html($toggleLabel); ?>
                                     </a>
                                     &nbsp;
                                     <a href="<?php echo esc_url($deleteUrl); ?>"
-                                       class="button button-small"
-                                       style="color: #a00; border-color: #a00;"
-                                       onclick="return confirm('Delete this experiment? This cannot be undone.');">
+                                        class="button button-small"
+                                        style="color: #a00; border-color: #a00;"
+                                        onclick="return confirm('Delete this experiment? This cannot be undone.');">
                                         Delete
                                     </a>
                                 </td>
@@ -430,10 +455,11 @@ class ExperimentsPage {
             <?php $this->renderCreateForm(); ?>
 
         </div>
-        <?php
+    <?php
     }
 
-    private function renderEdit(int $id): void {
+    private function renderEdit(int $id): void
+    {
         global $wpdb;
 
         if ($id <= 0) {
@@ -452,7 +478,7 @@ class ExperimentsPage {
 
         $listUrl = add_query_arg(['page' => $this->menuSlug], admin_url('admin.php'));
 
-        ?>
+    ?>
         <div class="wrap">
             <h1 class="wp-heading-inline">
                 Edit Experiment: <?php echo esc_html($exp->name); ?>
@@ -463,7 +489,7 @@ class ExperimentsPage {
             <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 800px; margin-top: 16px;">
                 <form method="post" action="">
                     <?php wp_nonce_field('abtf_update_experiment_' . intval($exp->id)); ?>
-                    <input type="hidden" name="abtf_action"   value="update">
+                    <input type="hidden" name="abtf_action" value="update">
                     <input type="hidden" name="experiment_id" value="<?php echo intval($exp->id); ?>">
 
                     <table class="form-table">
@@ -478,29 +504,29 @@ class ExperimentsPage {
                             <th scope="row"><label for="edit_name">Name (Internal)</label></th>
                             <td>
                                 <input name="name" type="text" id="edit_name" class="regular-text"
-                                       value="<?php echo esc_attr($exp->name); ?>" required>
+                                    value="<?php echo esc_attr($exp->name); ?>" required>
                             </td>
                         </tr>
                         <tr>
                             <th scope="row"><label for="edit_selector">CSS Selector</label></th>
                             <td>
                                 <input name="selector" type="text" id="edit_selector" class="regular-text"
-                                       value="<?php echo esc_attr($exp->selector); ?>" required>
+                                    value="<?php echo esc_attr($exp->selector); ?>" required>
                             </td>
                         </tr>
                         <tr>
                             <th scope="row"><label for="edit_event_name">Event Name</label></th>
                             <td>
                                 <input name="event_name" type="text" id="edit_event_name" class="regular-text"
-                                       value="<?php echo esc_attr($exp->event_name); ?>" required>
+                                    value="<?php echo esc_attr($exp->event_name); ?>" required>
                             </td>
                         </tr>
                         <tr>
                             <th scope="row"><label for="edit_event_type">Event Type</label></th>
                             <td>
                                 <input name="event_type" type="text" id="edit_event_type" class="regular-text"
-                                       value="<?php echo esc_attr($exp->event_type); ?>" required
-                                       placeholder="click, scroll, submit, mouseover...">
+                                    value="<?php echo esc_attr($exp->event_type); ?>" required
+                                    placeholder="click, scroll, submit, mouseover...">
                                 <p class="description">Any valid DOM event type.</p>
                             </td>
                         </tr>
@@ -508,7 +534,7 @@ class ExperimentsPage {
                             <th scope="row"><label for="edit_urls">URLs</label></th>
                             <td>
                                 <textarea name="urls" id="edit_urls" class="large-text" rows="3"
-                                          required><?php echo esc_textarea($exp->urls); ?></textarea>
+                                    required><?php echo esc_textarea($exp->urls); ?></textarea>
                                 <p class="description">
                                     Comma-separated. Use <code>*</code> for wildcards (e.g., <code>/blog/*</code>).
                                 </p>
@@ -520,11 +546,12 @@ class ExperimentsPage {
                 </form>
             </div>
         </div>
-        <?php
+    <?php
     }
 
-    private function renderCreateForm(): void {
-        ?>
+    private function renderCreateForm(): void
+    {
+    ?>
         <div id="abtf-add-new" style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 800px;">
             <h2 style="margin-top: 0;">Add New Experiment</h2>
             <form method="post" action="">
@@ -536,14 +563,14 @@ class ExperimentsPage {
                         <th scope="row"><label for="name">Name (Internal)</label></th>
                         <td>
                             <input name="name" type="text" id="name" class="regular-text"
-                                   required placeholder="E.g.: CTA Redesign">
+                                required placeholder="E.g.: CTA Redesign">
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="flag_key">Flag Key</label></th>
                         <td>
                             <input name="flag_key" type="text" id="flag_key" class="regular-text"
-                                   required placeholder="E.g.: cta_version_test">
+                                required placeholder="E.g.: cta_version_test">
                             <p class="description">Must exactly match the key in AB Tasty Flagship.</p>
                         </td>
                     </tr>
@@ -551,22 +578,22 @@ class ExperimentsPage {
                         <th scope="row"><label for="selector">CSS Selector</label></th>
                         <td>
                             <input name="selector" type="text" id="selector" class="regular-text"
-                                   required placeholder="E.g.: .main-btn">
+                                required placeholder="E.g.: .main-btn">
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="event_name">Event Name</label></th>
                         <td>
                             <input name="event_name" type="text" id="event_name" class="regular-text"
-                                   required placeholder="E.g.: main_btn_click">
+                                required placeholder="E.g.: main_btn_click">
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="event_type">Event Type</label></th>
                         <td>
                             <input name="event_type" type="text" id="event_type" class="regular-text"
-                                   required placeholder="click, scroll, submit, mouseover..."
-                                   value="click">
+                                required placeholder="click, scroll, submit, mouseover..."
+                                value="click">
                             <p class="description">Any valid DOM event type.</p>
                         </td>
                     </tr>
@@ -574,7 +601,7 @@ class ExperimentsPage {
                         <th scope="row"><label for="urls">URLs</label></th>
                         <td>
                             <textarea name="urls" id="urls" class="large-text" rows="3"
-                                      required placeholder="/, /talent/*"></textarea>
+                                required placeholder="/, /talent/*"></textarea>
                             <p class="description">
                                 Comma-separated. Use <code>*</code> for wildcards (e.g., <code>/blog/*</code>).
                             </p>
@@ -585,14 +612,15 @@ class ExperimentsPage {
                 <?php submit_button('Create Experiment', 'primary'); ?>
             </form>
         </div>
-        <?php
+<?php
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    private function statusBadge(string $status): string {
+    private function statusBadge(string $status): string
+    {
         $styles = [
             'active' => 'background: #b8e6bf; color: #125222;',
             'paused' => 'background: #f0e0a0; color: #5a4000;',
@@ -605,5 +633,19 @@ class ExperimentsPage {
             esc_attr($style),
             esc_html($status)
         );
+    }
+
+    private function handleRebuildStats(): void
+    {
+        $this->requirePermission();
+        check_admin_referer('abtf_rebuild_stats');
+
+        $result = StatsRebuildJob::run();
+
+        $noticeKey  = $result['error'] === null ? 'stats_rebuilt' : 'stats_error';
+        $noticeType = $result['error'] === null ? 'success' : 'error';
+
+        wp_safe_redirect($this->redirectUrl([], $noticeKey, $noticeType));
+        exit;
     }
 }
