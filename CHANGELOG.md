@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-05-13
+
+### Added
+- Encryption class — AES-256-CBC symmetric encryption using a key derived from
+  WordPress AUTH_KEY + AUTH_SALT; credentials are never stored in plain text
+- CredentialsManager class — reads Flagship credentials with a clear priority chain:
+  PHP constants in wp-config.php → encrypted values in wp_options → null (SimulatorAdapter)
+  Results are cached statically to avoid repeated decryption per request
+- Settings page (AB Tests → Settings) — admin UI to save and remove Flagship
+  credentials without touching wp-config.php; shows read-only view when constants
+  are defined; API key field masked as password input
+- "Remove Credentials" button in Settings page — deletes encrypted values from
+  wp_options and falls back to SimulatorAdapter
+
+### Changed
+- abtf_runner() now uses CredentialsManager::hasCredentials() instead of checking
+  PHP constants directly
+- abtf_check_credentials() admin notice now links to the Settings page
+- abtf_shutdown() now uses CredentialsManager::hasCredentials()
+- FlagshipAdapter::initialize() reads credentials from CredentialsManager
+- EventEndpoint::initializeFlagship() and sendHitToFlagship() read credentials
+  from CredentialsManager
+
 ## [1.3.0] - 2026-05-12
 
 ### Added
