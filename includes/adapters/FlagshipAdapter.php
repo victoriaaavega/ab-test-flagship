@@ -14,7 +14,8 @@ use Flagship\Enum\CacheStrategy;
  * Connects to AB Tasty Flagship API to decide which variant a visitor should see.
  * Requires FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY constants defined in wp-config.php.
  */
-class FlagshipAdapter implements DecisionAdapterInterface {
+class FlagshipAdapter implements DecisionAdapterInterface
+{
 
     private static bool $initialized = false;
 
@@ -22,19 +23,23 @@ class FlagshipAdapter implements DecisionAdapterInterface {
      * Initializes the Flagship SDK once per request.
      * Checks for credentials before attempting to start the SDK.
      */
-    private function initialize(): void {
+    private function initialize(): void
+    {
         if (self::$initialized) {
             return;
         }
 
-        if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {
-            error_log('[AB Test] FlagshipAdapter: credentials not found. Define FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY in wp-config.php.');
+        $envId  = CredentialsManager::getEnvId();
+        $apiKey = CredentialsManager::getApiKey();
+
+        if ($envId === null || $apiKey === null) {
+            error_log('[AB Test] FlagshipAdapter: credentials not found.');
             return;
         }
 
         Flagship::start(
-            FLAGSHIP_ENV_ID,
-            FLAGSHIP_API_KEY,
+            $envId,
+            $apiKey,
             FlagshipConfig::decisionApi()
                 ->setLogLevel(LogLevel::ERROR)
                 ->setHitCacheImplementation(new HitCacheRedis())
@@ -52,7 +57,8 @@ class FlagshipAdapter implements DecisionAdapterInterface {
      * @param string $experimentId Flag key as defined in Flagship dashboard
      * @return string
      */
-    public function decide(string $visitorId, string $experimentId): string {
+    public function decide(string $visitorId, string $experimentId): string
+    {
         $this->initialize();
 
         try {
@@ -71,7 +77,6 @@ class FlagshipAdapter implements DecisionAdapterInterface {
             error_log("[AB Test] Flagship decision for '{$experimentId}': {$value}");
 
             return (string) $value;
-
         } catch (\Exception $e) {
             error_log('[AB Test] Flagship error: ' . $e->getMessage() . '. Serving control.');
             return 'control';

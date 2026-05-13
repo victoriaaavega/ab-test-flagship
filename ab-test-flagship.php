@@ -36,6 +36,9 @@ require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/ExperimentsPage.php';
 require_once ABTF_PLUGIN_DIR . 'includes/AutoInjector.php';
 require_once ABTF_PLUGIN_DIR . 'includes/StatsRebuildJob.php';
 require_once ABTF_PLUGIN_DIR . 'includes/CronManager.php';
+require_once ABTF_PLUGIN_DIR . 'includes/Encryption.php';
+require_once ABTF_PLUGIN_DIR . 'includes/CredentialsManager.php';
+require_once ABTF_PLUGIN_DIR . 'includes/Settings.php';
 
 // -----------------------------------------------------------------------------
 // Bootstrap — runs after all plugins are loaded
@@ -59,6 +62,7 @@ add_action('plugins_loaded', function (): void {
     if (is_admin()) {
         new MetaBox();
         new ExperimentsPage();
+        new Settings();
     }
 });
 
@@ -103,11 +107,14 @@ function abtf_check_credentials(): void {
         return;
     }
 
-    if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {
+    if (!CredentialsManager::hasCredentials()) {
         add_action('admin_notices', function (): void {
+            $settingsUrl = admin_url('admin.php?page=abtf-settings');
             echo '<div class="notice notice-error"><p>';
             echo '<strong>AB Test Flagship:</strong> ';
-            echo esc_html('Flagship credentials are not configured. Please define FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY in wp-config.php.');
+            echo 'Flagship credentials are not configured. ';
+            echo '<a href="' . esc_url($settingsUrl) . '">Configure them here</a> or define ';
+            echo '<code>FLAGSHIP_ENV_ID</code> and <code>FLAGSHIP_API_KEY</code> in wp-config.php.';
             echo '</p></div>';
         });
     }
@@ -137,7 +144,7 @@ function abtf_runner(): ExperimentRunner {
     static $runner = null;
 
     if ($runner === null) {
-        $adapter = (defined('FLAGSHIP_ENV_ID') && defined('FLAGSHIP_API_KEY'))
+        $adapter = CredentialsManager::hasCredentials()
             ? new FlagshipAdapter()
             : new SimulatorAdapter();
 
@@ -170,7 +177,7 @@ register_deactivation_hook(__FILE__, function (): void {
 });
 
 function abtf_shutdown(): void {
-    if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {
+    if (!CredentialsManager::hasCredentials()) {
         return;
     }
 

@@ -149,9 +149,17 @@ class EventEndpoint
             return;
         }
 
+        $envId  = CredentialsManager::getEnvId();
+        $apiKey = CredentialsManager::getApiKey();
+
+        if ($envId === null || $apiKey === null) {
+            error_log('[AB Test] EventEndpoint: credentials not found.');
+            return;
+        }
+
         Flagship::start(
-            FLAGSHIP_ENV_ID,
-            FLAGSHIP_API_KEY,
+            $envId,
+            $apiKey,
             FlagshipConfig::decisionApi()
                 ->setLogLevel(LogLevel::ERROR)
                 ->setHitCacheImplementation(new HitCacheRedis())
@@ -173,7 +181,7 @@ class EventEndpoint
      */
     private function sendHitToFlagship(string $visitorId, string $eventName, string $variant): array
     {
-        if (!defined('FLAGSHIP_ENV_ID') || !defined('FLAGSHIP_API_KEY')) {
+        if (!CredentialsManager::hasCredentials()) {
             error_log('[AB Test] Flagship credentials not found. Hit not sent.');
             return ['success' => false, 'message' => 'Flagship credentials not configured.'];
         }
@@ -204,7 +212,8 @@ class EventEndpoint
      *
      * @return string
      */
-    private function getClientIp(): string {
+    private function getClientIp(): string
+    {
         $headers = [
             'HTTP_CF_CONNECTING_IP',
             'HTTP_X_FORWARDED_FOR',
