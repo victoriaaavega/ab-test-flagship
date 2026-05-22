@@ -7,9 +7,8 @@ if (!defined('ABSPATH')) {
 /**
  * Manages Flagship API credentials with a clear priority chain:
  *
- *   1. PHP constants in wp-config.php (backward compatibility)
- *   2. Encrypted values in wp_options (set via Settings page)
- *   3. null — triggers SimulatorAdapter fallback
+ *   1. Encrypted values in wp_options (set via Settings page)
+ *   2. null — triggers SimulatorAdapter fallback
  *
  * All reads are cached statically for the lifetime of the request
  * to avoid repeated decryption on every call.
@@ -86,42 +85,33 @@ class CredentialsManager {
     }
 
     /**
-     * Loads credentials once per request using the priority chain.
+     * Loads credentials once per request.
      * Results are cached statically to avoid repeated decryption.
      */
     private static function load(): void {
-        if (self::$loaded) {
-            return;
-        }
-
-        self::$loaded = true;
-
-        // Priority 1: PHP constants in wp-config.php
-        if (defined('FLAGSHIP_ENV_ID') && defined('FLAGSHIP_API_KEY')) {
-            self::$envId  = FLAGSHIP_ENV_ID;
-            self::$apiKey = FLAGSHIP_API_KEY;
-            return;
-        }
-
-        // Priority 2: Encrypted values in wp_options
-        $encryptedEnvId  = get_option(self::OPTION_ENV_ID, '');
-        $encryptedApiKey = get_option(self::OPTION_API_KEY, '');
-
-        if ($encryptedEnvId !== '' && $encryptedApiKey !== '') {
-            $envId  = Encryption::decrypt($encryptedEnvId);
-            $apiKey = Encryption::decrypt($encryptedApiKey);
-
-            if ($envId !== null && $apiKey !== null) {
-                self::$envId  = $envId;
-                self::$apiKey = $apiKey;
-                return;
-            }
-
-            error_log('[AB Test] CredentialsManager: decryption failed. Credentials may be corrupted.');
-        }
-
-        // Priority 3: No credentials — SimulatorAdapter will be used
-        self::$envId  = null;
-        self::$apiKey = null;
+    if (self::$loaded) {
+        return;
     }
+
+    self::$loaded = true;
+
+    $encryptedEnvId  = get_option(self::OPTION_ENV_ID, '');
+    $encryptedApiKey = get_option(self::OPTION_API_KEY, '');
+
+    if ($encryptedEnvId !== '' && $encryptedApiKey !== '') {
+        $envId  = Encryption::decrypt($encryptedEnvId);
+        $apiKey = Encryption::decrypt($encryptedApiKey);
+
+        if ($envId !== null && $apiKey !== null) {
+            self::$envId  = $envId;
+            self::$apiKey = $apiKey;
+            return;
+        }
+
+        error_log('[AB Test] CredentialsManager: decryption failed. Credentials may be corrupted.');
+    }
+
+    self::$envId  = null;
+    self::$apiKey = null;
+}
 }

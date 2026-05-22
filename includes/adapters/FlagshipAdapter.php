@@ -12,7 +12,7 @@ use Flagship\Enum\CacheStrategy;
 /**
  * Flagship SDK implementation of the decision adapter.
  * Connects to AB Tasty Flagship API to decide which variant a visitor should see.
- * Requires FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY constants defined in wp-config.php.
+ * Reads credentials from CredentialsManager (stored encrypted in wp_options).
  */
 class FlagshipAdapter implements DecisionAdapterInterface
 {

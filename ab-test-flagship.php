@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: AB Test Flagship
  * Description: Server-side A/B testing using AB Tasty Flagship SDK
@@ -70,7 +71,8 @@ add_action('plugins_loaded', function (): void {
 // Frontend scripts
 // -----------------------------------------------------------------------------
 
-function abtf_enqueue_scripts(): void {
+function abtf_enqueue_scripts(): void
+{
     if (is_admin()) {
         return;
     }
@@ -102,7 +104,8 @@ add_action('wp_enqueue_scripts', 'abtf_enqueue_scripts');
 // Admin notices
 // -----------------------------------------------------------------------------
 
-function abtf_check_credentials(): void {
+function abtf_check_credentials(): void
+{
     if (!current_user_can('manage_options')) {
         return;
     }
@@ -113,8 +116,7 @@ function abtf_check_credentials(): void {
             echo '<div class="notice notice-error"><p>';
             echo '<strong>AB Test Flagship:</strong> ';
             echo 'Flagship credentials are not configured. ';
-            echo '<a href="' . esc_url($settingsUrl) . '">Configure them here</a> or define ';
-            echo '<code>FLAGSHIP_ENV_ID</code> and <code>FLAGSHIP_API_KEY</code> in wp-config.php.';
+            echo '<a href="' . esc_url($settingsUrl) . '">Configure them in AB Tests → Settings</a>.';
             echo '</p></div>';
         });
     }
@@ -128,7 +130,8 @@ add_action('admin_init', 'abtf_check_credentials');
 /**
  * Creates a nonce in a user-0 context so it works regardless of login state.
  */
-function abtf_create_public_nonce(string $action): string {
+function abtf_create_public_nonce(string $action): string
+{
     $savedUserId = get_current_user_id();
     wp_set_current_user(0);
     $nonce = wp_create_nonce($action);
@@ -140,7 +143,8 @@ function abtf_create_public_nonce(string $action): string {
  * Returns the singleton ExperimentRunner, choosing the correct adapter
  * based on whether Flagship credentials are configured.
  */
-function abtf_runner(): ExperimentRunner {
+function abtf_runner(): ExperimentRunner
+{
     static $runner = null;
 
     if ($runner === null) {
@@ -158,7 +162,8 @@ function abtf_runner(): ExperimentRunner {
 // Init hook — DB + frontend AutoInjector
 // -----------------------------------------------------------------------------
 
-function abtf_init(): void {
+function abtf_init(): void
+{
     $database = new Database();
     $database->maybeCreateTable();
 
@@ -176,7 +181,8 @@ register_deactivation_hook(__FILE__, function (): void {
     CronManager::unschedule();
 });
 
-function abtf_shutdown(): void {
+function abtf_shutdown(): void
+{
     if (!CredentialsManager::hasCredentials()) {
         return;
     }
