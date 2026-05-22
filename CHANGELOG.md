@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-05-21
+
+### Changed
+- Credentials are now stored exclusively in wp_options (encrypted). Support for
+  PHP constants FLAGSHIP_ENV_ID and FLAGSHIP_API_KEY in wp-config.php has been
+  removed to prevent credentials from leaking into version control.
+- CredentialsManager::load() now reads only from wp_options. The PHP constants
+  priority chain has been eliminated.
+- Settings page always renders the editable form. The read-only mode shown when
+  constants were defined in wp-config.php has been removed.
+- Admin notice for missing credentials no longer references wp-config.php.
+- FlagshipAdapter docblock updated to reflect that credentials come from
+  CredentialsManager, not PHP constants.
+- Settings docblock updated to remove reference to wp-config.php priority chain.
+
 ## [1.4.0] - 2026-05-13
 
 ### Added
