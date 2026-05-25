@@ -40,6 +40,7 @@ require_once ABTF_PLUGIN_DIR . 'includes/CronManager.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Encryption.php';
 require_once ABTF_PLUGIN_DIR . 'includes/CredentialsManager.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Settings.php';
+require_once ABTF_PLUGIN_DIR . 'includes/IdentifyEndpoint.php';
 
 // -----------------------------------------------------------------------------
 // Bootstrap — runs after all plugins are loaded
@@ -59,6 +60,7 @@ new CronManager();
 
 add_action('plugins_loaded', function (): void {
     new EventEndpoint();
+    new IdentifyEndpoint();
 
     if (is_admin()) {
         new MetaBox();
@@ -70,6 +72,23 @@ add_action('plugins_loaded', function (): void {
 // -----------------------------------------------------------------------------
 // Frontend scripts
 // -----------------------------------------------------------------------------
+
+/**
+ * Derives the shared cookie domain from the site's home URL.
+ * Returns '.castingnetworks.com' in production, '.test.test' locally, etc.
+ * Returns an empty string for single-word hosts like 'localhost'.
+ */
+function abtf_get_cookie_domain(): string
+{
+    $host  = parse_url(home_url(), PHP_URL_HOST) ?? '';
+    $parts = explode('.', $host);
+
+    if (count($parts) >= 2) {
+        return '.' . implode('.', array_slice($parts, -2));
+    }
+
+    return ''; // e.g. localhost — omit domain attribute from cookie
+}
 
 function abtf_enqueue_scripts(): void
 {
@@ -94,8 +113,10 @@ function abtf_enqueue_scripts(): void
     );
 
     wp_localize_script('abtf-event-tracker', 'abtfConfig', [
-        'apiUrl' => rest_url('abtest/v1/event'),
-        'nonce'  => abtf_create_public_nonce('abtf_track_event'),
+        'apiUrl'      => rest_url('abtest/v1/event'),
+        'identifyUrl' => rest_url('abtest/v1/identify'),
+        'nonce'       => abtf_create_public_nonce('abtf_track_event'),
+        'cookieDomain' => abtf_get_cookie_domain(),
     ]);
 }
 add_action('wp_enqueue_scripts', 'abtf_enqueue_scripts');

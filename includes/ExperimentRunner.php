@@ -34,7 +34,6 @@ class ExperimentRunner {
 
         if (!self::$bootstrapped) {
             $this->setCacheBypassHeaders();
-            $this->setHeapIdentityCookie($visitorId);
             self::$bootstrapped = true;
         }
 
@@ -96,7 +95,7 @@ class ExperimentRunner {
     }
 
     /**
-     * Builds the result array returned by run()
+     * Builds the result array returned by run().
      *
      * @param string $experimentId
      * @param string $visitorId
@@ -125,29 +124,5 @@ class ExperimentRunner {
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
         header('Expires: 0');
-    }
-
-    /**
-     * Sets a first-party cookie with the visitor ID for Heap identity sync.
-     * JavaScript reads this cookie and calls heap.identify().
-     *
-     * @param string $visitorId
-     */
-    private function setHeapIdentityCookie(string $visitorId): void {
-        if (headers_sent() || isset($_COOKIE['heap_visitor_id'])) {
-            return;
-        }
-
-        setcookie(
-            'heap_visitor_id',
-            $visitorId,
-            [
-                'expires'  => time() + (60 * 60 * 24 * 30),
-                'path'     => '/',
-                'secure'   => is_ssl(),
-                'httponly' => false,
-                'samesite' => 'Lax',
-            ]
-        );
     }
 }
