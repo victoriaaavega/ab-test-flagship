@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-05-25
+
+### Added
+- IdentifyEndpoint class — POST /wp-json/abtest/v1/identify. Receives a
+  fingerprint visitor ID and a Heap user ID, computes the Heap-based visitor ID
+  (SHA256 of "heap:" + heap_user_id), and copies all variant assignments from
+  the fingerprint visitor to the Heap visitor in both Redis and the database.
+  Uses INSERT IGNORE so existing Heap assignments are never overwritten.
+  Secured with the same nonce + rate limiter as EventEndpoint.
+- abtf_get_cookie_domain() helper in ab-test-flagship.php — derives the shared
+  cookie domain from home_url() (e.g. .castingnetworks.com in production,
+  .test.test locally) so no domain is hardcoded anywhere in the codebase.
+- cookieDomain and identifyUrl added to the abtfConfig object injected by
+  wp_localize_script, making both values available to JavaScript without
+  string manipulation or hardcoded URLs.
+
+### Changed
+- Fingerprint::generateVisitorId() now checks the abtf_heap_id cookie first.
+  If a valid Heap user ID is present (numeric string, 1–20 digits), it returns
+  SHA256("heap:" + heapUserId) as the visitor ID. Falls back to the original
+  SHA256(IP + UA + Language) fingerprint when the cookie is absent or invalid.
+  Output format is unchanged — always a 64-char hex string.
+- heap-sync.js rewritten. Now reads window.heap.userId, validates it, and
+  writes it to the abtf_heap_id cookie (domain from abtfConfig.cookieDomain,
+  30-day TTL). On the first write (cookie previously absent), calls
+  POST /abtest/v1/identify to copy fingerprint assignments to the Heap visitor
+  ID — fire-and-forget, non-blocking. On subsequent page loads the cookie
+  already matches and nothing is done. Removed the heap.identify() call with
+  the fingerprint visitor ID — Heap's own persistent ID is now the source of
+  truth, not the plugin's fingerprint.
+- ExperimentRunner::run() no longer calls setHeapIdentityCookie(). The
+  heap_visitor_id cookie is no longer written — abtf_heap_id written by
+  heap-sync.js replaces it entirely.
+- ExperimentRunner::setHeapIdentityCookie() removed.
+- IdentifyEndpoint registered in plugins_loaded alongside EventEndpoint.
+
 ## [1.4.1] - 2026-05-21
 
 ### Changed
