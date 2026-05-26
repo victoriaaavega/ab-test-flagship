@@ -8,50 +8,61 @@ if (!defined('ABSPATH')) {
  * Generates a unique visitor ID for AB test variant assignment.
  *
  * Priority:
- *   1. Heap persistent user ID (abtf_heap_id cookie) — set by heap-sync.js on the
- *      first page load after Heap initializes. Survives IP changes, browser updates,
- *      and is shared across subdomains (www / app) via domain=.castingnetworks.com.
- *   2. Fingerprint fallback — SHA256 of IP + User-Agent + Accept-Language. Used only
- *      on the very first visit, before heap-sync.js has had a chance to write the cookie.
+ *   1. External provider cookie (abtf_visitor_id) — written by visitor-sync.js
+ *      when the active provider is 'heap' or 'custom'. The raw value is prefixed
+ *      with the provider slug before hashing so IDs never collide across providers.
+ *   2. Fingerprint fallback — SHA256 of IP + User-Agent + Accept-Language. Used
+ *      when provider is 'fingerprint', or on the very first visit before
+ *      visitor-sync.js has written the cookie.
  *
  * Both paths produce a 64-char hex SHA256 string, so nothing downstream changes.
  */
-class Fingerprint {
-
+class Fingerprint
+{
     /**
-     * Returns the visitor ID, preferring the Heap persistent ID when available.
+     * Returns the visitor ID based on the active provider configuration.
      *
      * @return string 64-char SHA256 hex string
      */
-    public function generateVisitorId(): string {
-        $heapId = $this->readHeapCookie();
+    public function generateVisitorId(): string
+    {
+        if (VisitorIdProvider::usesExternalId()) {
+            $externalId = $this->readVisitorCookie();
 
-        if ($heapId !== null) {
-            // Prefix with 'heap:' to ensure the hash never collides with a fingerprint.
-            return hash('sha256', 'heap:' . $heapId);
+            if ($externalId !== null) {
+                $prefix = VisitorIdProvider::getHashPrefix();
+                return hash('sha256', $prefix . $externalId);
+            }
+
+            // Cookie not yet written — fall through to fingerprint for this request.
+            // visitor-sync.js will write the cookie and call IdentifyEndpoint
+            // to reconcile on the same page load.
         }
 
         return $this->generateFingerprint();
     }
 
     /**
-     * Reads and validates the Heap user ID from the abtf_heap_id cookie.
-     * Returns null if the cookie is absent or its value is not a valid Heap ID.
+     * Reads and validates the external visitor ID from the abtf_visitor_id cookie.
+     * Returns null if the cookie is absent or empty.
      *
-     * Heap user IDs are large positive integers (up to ~19 digits).
+     * The raw value is provider-agnostic: heap writes a numeric string,
+     * custom providers may write any non-empty string. Basic sanitization only —
+     * format validation is the provider's responsibility.
      *
      * @return string|null
      */
-    private function readHeapCookie(): ?string {
-        if (empty($_COOKIE['abtf_heap_id'])) {
+    private function readVisitorCookie(): ?string
+    {
+        $cookieName = VisitorIdProvider::COOKIE_NAME;
+
+        if (empty($_COOKIE[$cookieName])) {
             return null;
         }
 
-        $value = sanitize_text_field($_COOKIE['abtf_heap_id']);
+        $value = sanitize_text_field($_COOKIE[$cookieName]);
 
-        // Heap IDs are numeric strings, 1–20 digits, no leading zeros.
-        if (!preg_match('/^[1-9]\d{0,19}$/', $value)) {
-            error_log('[AB Test] Fingerprint: invalid abtf_heap_id value, falling back to fingerprint.');
+        if ($value === '') {
             return null;
         }
 
@@ -60,11 +71,12 @@ class Fingerprint {
 
     /**
      * Generates a visitor ID from request headers.
-     * Used only when no Heap cookie is present (first visit).
+     * Used when provider is 'fingerprint' or when no cookie is present yet.
      *
      * @return string 64-char SHA256 hex string
      */
-    private function generateFingerprint(): string {
+    private function generateFingerprint(): string
+    {
         $data = [
             'ip'              => $this->getClientIp(),
             'user_agent'      => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
@@ -79,7 +91,8 @@ class Fingerprint {
      *
      * @return string
      */
-    private function getClientIp(): string {
+    private function getClientIp(): string
+    {
         $headers = [
             'HTTP_CF_CONNECTING_IP',
             'HTTP_X_FORWARDED_FOR',

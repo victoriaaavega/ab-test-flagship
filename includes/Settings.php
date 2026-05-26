@@ -9,6 +9,9 @@ if (!defined('ABSPATH')) {
  *
  * Credentials are encrypted before being stored in wp_options.
  * This is the only supported method for configuring Flagship credentials.
+ *
+ * Also manages the Visitor ID Provider configuration, which determines
+ * how the plugin resolves a persistent visitor ID across page loads.
  */
 class Settings
 {
@@ -55,9 +58,10 @@ class Settings
         $action = sanitize_key($_POST['abtf_settings_action'] ?? '');
 
         match ($action) {
-            'save'   => $this->handleSave(),
-            'delete' => $this->handleDelete(),
-            default  => null,
+            'save'             => $this->handleSave(),
+            'delete'           => $this->handleDelete(),
+            'save_provider'    => $this->handleSaveProvider(),
+            default            => null,
         };
     }
 
@@ -86,6 +90,26 @@ class Settings
         $this->redirect('deleted', 'success');
     }
 
+    private function handleSaveProvider(): void
+    {
+        check_admin_referer('abtf_save_provider');
+
+        $provider = sanitize_key($_POST['visitor_id_provider'] ?? '');
+        $jsPath   = sanitize_text_field($_POST['visitor_id_js_path'] ?? '');
+
+        if (!in_array($provider, VisitorIdProvider::VALID_PROVIDERS, true)) {
+            $this->redirect('provider_invalid', 'error');
+        }
+
+        if ($provider === VisitorIdProvider::PROVIDER_CUSTOM && $jsPath === '') {
+            $this->redirect('provider_js_path_required', 'error');
+        }
+
+        $ok = VisitorIdProvider::save($provider, $jsPath ?: null);
+
+        $this->redirect($ok ? 'provider_saved' : 'provider_invalid', $ok ? 'success' : 'error');
+    }
+
     private function redirect(string $notice, string $type): void
     {
         wp_safe_redirect(add_query_arg([
@@ -101,10 +125,13 @@ class Settings
     // -------------------------------------------------------------------------
 
     private const NOTICE_MESSAGES = [
-        'saved'          => 'Credentials saved and encrypted successfully.',
-        'deleted'        => 'Credentials removed from database.',
-        'invalid_fields' => 'Both fields are required.',
-        'encrypt_error'  => 'Encryption failed. Check that AUTH_KEY and AUTH_SALT are defined in wp-config.php.',
+        'saved'                    => 'Credentials saved and encrypted successfully.',
+        'deleted'                  => 'Credentials removed from database.',
+        'invalid_fields'           => 'Both fields are required.',
+        'encrypt_error'            => 'Encryption failed. Check that AUTH_KEY and AUTH_SALT are defined in wp-config.php.',
+        'provider_saved'           => 'Visitor ID provider saved successfully.',
+        'provider_invalid'         => 'Invalid provider selected.',
+        'provider_js_path_required'=> 'A JavaScript path is required for the Custom provider.',
     ];
 
     public function renderNotice(): void
@@ -137,10 +164,13 @@ class Settings
     public function renderPage(): void
     {
         $hasDbCredentials = get_option(CredentialsManager::OPTION_ENV_ID, '') !== '';
+        $currentProvider  = VisitorIdProvider::getProvider();
+        $currentJsPath    = VisitorIdProvider::getJsPath() ?? '';
 ?>
         <div class="wrap">
             <h1>AB Test — Settings</h1>
 
+            <!-- Section 1: Flagship Credentials -->
             <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 600px; margin-top: 16px;">
                 <h2 style="margin-top: 0;">Flagship Credentials</h2>
 
@@ -209,6 +239,7 @@ class Settings
                 <?php endif; ?>
             </div>
 
+            <!-- Section 2: Current credentials status -->
             <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 600px; margin-top: 16px;">
                 <h2 style="margin-top: 0;">Current Status</h2>
                 <?php
@@ -220,7 +251,97 @@ class Settings
                     <?php echo esc_html($status['label']); ?>
                 </span>
             </div>
+
+            <!-- Section 3: Visitor ID Provider -->
+            <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 600px; margin-top: 16px;">
+                <h2 style="margin-top: 0;">Visitor ID Provider</h2>
+                <p style="color: #555; margin-bottom: 20px;">
+                    Determines how the plugin identifies returning visitors. Choose
+                    <strong>Fingerprint</strong> if you have no analytics tool,
+                    <strong>Heap</strong> if the site uses Heap Analytics, or
+                    <strong>Custom</strong> to read an ID from any JavaScript variable.
+                </p>
+
+                <form method="post" action="">
+                    <?php wp_nonce_field('abtf_save_provider'); ?>
+                    <input type="hidden" name="abtf_settings_action" value="save_provider">
+
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">Provider</th>
+                            <td>
+                                <fieldset>
+                                    <label style="display: block; margin-bottom: 10px;">
+                                        <input type="radio"
+                                            name="visitor_id_provider"
+                                            value="fingerprint"
+                                            <?php checked($currentProvider, 'fingerprint'); ?>
+                                            onchange="abtfToggleJsPath(this.value)">
+                                        <strong>Fingerprint</strong>
+                                        <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
+                                            SHA256 of IP + User-Agent + Accept-Language. No JavaScript dependency.
+                                            Works out of the box but does not persist across IP changes or devices.
+                                        </span>
+                                    </label>
+
+                                    <label style="display: block; margin-bottom: 10px;">
+                                        <input type="radio"
+                                            name="visitor_id_provider"
+                                            value="heap"
+                                            <?php checked($currentProvider, 'heap'); ?>
+                                            onchange="abtfToggleJsPath(this.value)">
+                                        <strong>Heap</strong>
+                                        <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
+                                            Reads <code>window.heap.userId</code>. Requires the Heap Analytics snippet
+                                            to be installed on the site.
+                                        </span>
+                                    </label>
+
+                                    <label style="display: block; margin-bottom: 10px;">
+                                        <input type="radio"
+                                            name="visitor_id_provider"
+                                            value="custom"
+                                            <?php checked($currentProvider, 'custom'); ?>
+                                            onchange="abtfToggleJsPath(this.value)">
+                                        <strong>Custom</strong>
+                                        <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
+                                            Read an ID from any JavaScript variable available on the page.
+                                        </span>
+                                    </label>
+                                </fieldset>
+                            </td>
+                        </tr>
+
+                        <tr id="abtf-js-path-row" style="<?php echo $currentProvider === 'custom' ? '' : 'display:none;'; ?>">
+                            <th scope="row"><label for="visitor_id_js_path">JavaScript Path</label></th>
+                            <td>
+                                <input type="text"
+                                    name="visitor_id_js_path"
+                                    id="visitor_id_js_path"
+                                    class="regular-text"
+                                    value="<?php echo esc_attr($currentJsPath); ?>"
+                                    placeholder="e.g. window.myApp.user.id">
+                                <p class="description">
+                                    Dot-notation path to the visitor ID variable. Must be available
+                                    synchronously when the page loads (not inside a callback).
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <?php submit_button('Save Provider', 'primary', 'submit', false); ?>
+                </form>
+            </div>
         </div>
+
+        <script>
+            function abtfToggleJsPath(provider) {
+                var row = document.getElementById('abtf-js-path-row');
+                if (row) {
+                    row.style.display = provider === 'custom' ? '' : 'none';
+                }
+            }
+        </script>
 <?php
     }
 }

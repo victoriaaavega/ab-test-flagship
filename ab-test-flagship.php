@@ -3,7 +3,7 @@
 /**
  * Plugin Name: AB Test Flagship
  * Description: Server-side A/B testing using AB Tasty Flagship SDK
- * Version: 1.3.0
+ * Version: 1.6.0
  * Author: Victoria Vega
  * Requires PHP: 8.1
  */
@@ -12,12 +12,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ABTF_VERSION', '1.3.0');
+define('ABTF_VERSION', '1.6.0');
 define('ABTF_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ABTF_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Dependencies and utilities
 require_once ABTF_PLUGIN_DIR . 'vendor/autoload.php';
+require_once ABTF_PLUGIN_DIR . 'includes/VisitorIdProvider.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Fingerprint.php';
 require_once ABTF_PLUGIN_DIR . 'includes/RedisClient.php';
 require_once ABTF_PLUGIN_DIR . 'includes/HitCacheRedis.php';
@@ -46,8 +47,6 @@ require_once ABTF_PLUGIN_DIR . 'includes/IdentifyEndpoint.php';
 // Bootstrap — runs after all plugins are loaded
 // -----------------------------------------------------------------------------
 
-// Register the interval filter as early as possible, before WordPress
-// calls wp_get_schedules() internally during cron setup.
 add_filter('cron_schedules', function (array $schedules): array {
     $schedules[CronManager::INTERVAL] = [
         'interval' => 8 * HOUR_IN_SECONDS,
@@ -87,7 +86,7 @@ function abtf_get_cookie_domain(): string
         return '.' . implode('.', array_slice($parts, -2));
     }
 
-    return ''; // e.g. localhost — omit domain attribute from cookie
+    return '';
 }
 
 function abtf_enqueue_scripts(): void
@@ -104,19 +103,26 @@ function abtf_enqueue_scripts(): void
         true
     );
 
-    wp_enqueue_script(
-        'abtf-heap-sync',
-        ABTF_PLUGIN_URL . 'assets/js/heap-sync.js',
-        [],
-        ABTF_VERSION,
-        true
-    );
+    // Only enqueue visitor-sync.js when the provider requires JS-side ID resolution.
+    // For fingerprint, PHP handles everything and there is nothing to sync.
+    if (VisitorIdProvider::usesExternalId()) {
+        wp_enqueue_script(
+            'abtf-visitor-sync',
+            ABTF_PLUGIN_URL . 'assets/js/visitor-sync.js',
+            [],
+            ABTF_VERSION,
+            true
+        );
+    }
 
     wp_localize_script('abtf-event-tracker', 'abtfConfig', [
-        'apiUrl'      => rest_url('abtest/v1/event'),
-        'identifyUrl' => rest_url('abtest/v1/identify'),
-        'nonce'       => abtf_create_public_nonce('abtf_track_event'),
-        'cookieDomain' => abtf_get_cookie_domain(),
+        'apiUrl'            => rest_url('abtest/v1/event'),
+        'identifyUrl'       => rest_url('abtest/v1/identify'),
+        'nonce'             => abtf_create_public_nonce('abtf_track_event'),
+        'cookieDomain'      => abtf_get_cookie_domain(),
+        // Passed to visitor-sync.js — null when provider is fingerprint.
+        'visitorIdProvider' => VisitorIdProvider::getProvider(),
+        'visitorIdJsPath'   => VisitorIdProvider::getJsPath(),
     ]);
 }
 add_action('wp_enqueue_scripts', 'abtf_enqueue_scripts');

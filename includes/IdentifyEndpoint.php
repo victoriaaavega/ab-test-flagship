@@ -5,15 +5,19 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Handles visitor identity reconciliation between fingerprint and Heap visitor IDs.
+ * Handles visitor identity reconciliation between fingerprint and external visitor IDs.
  *
- * Called once per user lifetime — on the first page load where heap-sync.js
- * writes the abtf_heap_id cookie for the first time.
+ * Called once per user lifetime — on the first page load where visitor-sync.js
+ * writes the abtf_visitor_id cookie for the first time.
  *
  * Copies all variant assignments stored under the fingerprint visitor ID to the
- * Heap-based visitor ID in both the database and Redis, so that from the next
- * page load onwards PHP finds the correct variant under the Heap ID without
+ * external visitor ID in both the database and Redis, so that from the next
+ * page load onwards PHP finds the correct variant under the external ID without
  * making a new decision.
+ *
+ * The external visitor ID is hashed using the provider prefix defined in
+ * VisitorIdProvider::getHashPrefix() so that IDs from different providers
+ * (heap, custom) never collide even if their raw values match.
  *
  * Endpoint: POST /wp-json/abtest/v1/identify
  */
@@ -40,11 +44,11 @@ class IdentifyEndpoint
                     'sanitize_callback' => 'sanitize_text_field',
                     'validate_callback' => fn($v) => !empty($v) && strlen($v) === 64 && ctype_xdigit($v),
                 ],
-                'heap_user_id' => [
+                'external_visitor_id' => [
                     'required'          => true,
                     'type'              => 'string',
                     'sanitize_callback' => 'sanitize_text_field',
-                    'validate_callback' => fn($v) => !empty($v) && preg_match('/^[1-9]\d{0,19}$/', $v),
+                    'validate_callback' => fn($v) => !empty($v) && strlen($v) <= 255,
                 ],
             ],
         ]);
@@ -79,7 +83,11 @@ class IdentifyEndpoint
 
     /**
      * Copies all variant assignments from the fingerprint visitor ID to the
-     * Heap-based visitor ID in both the database and Redis.
+     * external visitor ID in both the database and Redis.
+     *
+     * The external visitor ID is hashed with the active provider prefix so it
+     * matches exactly what Fingerprint::generateVisitorId() produces on the
+     * next page load.
      *
      * @param WP_REST_Request $request
      * @return WP_REST_Response
@@ -89,11 +97,14 @@ class IdentifyEndpoint
         global $wpdb;
 
         $fingerprintVisitorId = $request->get_param('fingerprint_visitor_id');
-        $heapUserId           = $request->get_param('heap_user_id');
-        $heapVisitorId        = hash('sha256', 'heap:' . $heapUserId);
+        $externalVisitorId    = $request->get_param('external_visitor_id');
+
+        // Build the hashed visitor ID the same way Fingerprint.php does it.
+        $prefix          = VisitorIdProvider::getHashPrefix();
+        $hashedVisitorId = hash('sha256', $prefix . $externalVisitorId);
 
         // If both IDs resolve to the same hash, nothing to do.
-        if ($fingerprintVisitorId === $heapVisitorId) {
+        if ($fingerprintVisitorId === $hashedVisitorId) {
             return new WP_REST_Response(['success' => true, 'copied' => 0], 200);
         }
 
@@ -117,17 +128,17 @@ class IdentifyEndpoint
         $copied   = 0;
 
         foreach ($assignments as $row) {
-            // INSERT IGNORE ensures we never overwrite an existing Heap ID assignment.
-            $database->saveVariant($row->experiment_id, $heapVisitorId, $row->variant);
+            // INSERT IGNORE ensures we never overwrite an existing external ID assignment.
+            $database->saveVariant($row->experiment_id, $hashedVisitorId, $row->variant);
 
             if ($redis->isAvailable()) {
-                $redis->saveVariant($row->experiment_id, $heapVisitorId, $row->variant);
+                $redis->saveVariant($row->experiment_id, $hashedVisitorId, $row->variant);
             }
 
             $copied++;
         }
 
-        error_log("[AB Test] IdentifyEndpoint: copied {$copied} assignment(s) from fingerprint {$fingerprintVisitorId} to Heap visitor {$heapVisitorId}.");
+        error_log("[AB Test] IdentifyEndpoint: copied {$copied} assignment(s) from fingerprint {$fingerprintVisitorId} to external visitor {$hashedVisitorId} (prefix: '{$prefix}').");
 
         return new WP_REST_Response(['success' => true, 'copied' => $copied], 200);
     }
