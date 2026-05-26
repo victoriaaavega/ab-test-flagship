@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-05-25
+
+### Added
+- VisitorIdProvider class — manages the visitor ID provider configuration stored
+  in wp_options. Supports three providers: fingerprint (default, no JS dependency),
+  heap (reads window.heap.userId), and custom (reads any admin-defined JS path
+  such as window.myApp.user.id). Exposes getProvider(), getJsPath(),
+  usesExternalId(), and getHashPrefix() so both PHP and the settings UI share
+  a single source of truth.
+- visitor-sync.js — generic replacement for heap-sync.js. Reads the JS path
+  configured in the plugin settings, resolves it on the window object (supports
+  dot-notation paths like window.myApp.user.id), writes the value to the
+  abtf_visitor_id cookie, and calls the identify endpoint on the first write
+  to reconcile fingerprint assignments. Fire-and-forget, non-blocking.
+- Visitor ID Provider section in Settings page — three radio options
+  (Fingerprint / Heap / Custom) with a conditional JS path input that appears
+  only when Custom is selected. Saved via its own POST action (save_provider)
+  following the same PRG pattern as credentials.
+
+### Changed
+- Fingerprint.php rewritten to use VisitorIdProvider instead of hardcoded
+  Heap logic. Now reads VisitorIdProvider::COOKIE_NAME (abtf_visitor_id) when
+  the active provider is heap or custom, and falls back to SHA256 fingerprint
+  otherwise. The hash prefix (heap:, custom:) is sourced from
+  VisitorIdProvider::getHashPrefix() so the namespace is always consistent
+  with what IdentifyEndpoint produces.
+- IdentifyEndpoint.php updated to accept external_visitor_id instead of
+  heap_user_id. The hashed visitor ID is now built using
+  VisitorIdProvider::getHashPrefix() so it matches exactly what
+  Fingerprint::generateVisitorId() produces on the next page load. Validation
+  relaxed to allow any non-empty string up to 255 chars (provider-agnostic).
+- Settings.php extended with handleSaveProvider() write handler and
+  renderPage() updated to include the new Visitor ID Provider section.
+  New notice keys: provider_saved, provider_invalid, provider_js_path_required.
+- ab-test-flagship.php updated to require VisitorIdProvider.php before
+  Fingerprint.php. Enqueues visitor-sync.js only when the active provider
+  requires JS-side ID resolution (usesExternalId() === true) — fingerprint
+  sites load no extra JS. Passes visitorIdProvider and visitorIdJsPath to
+  the abtfConfig object so visitor-sync.js needs no hardcoded values.
+  Version bumped to 1.6.0.
+
+### Removed
+- heap-sync.js — replaced by the generic visitor-sync.js. The Heap provider
+  is now just a preset that sets visitorIdJsPath to window.heap.userId.
+
+### Migration note
+- The cookie name changed from abtf_heap_id to abtf_visitor_id. Existing
+  visitors in production will lose their cookie on deploy and be treated as
+  first-time visitors for one page load, after which visitor-sync.js will
+  write the new cookie and reconcile their assignments. No data is lost —
+  IdentifyEndpoint copies assignments to the new visitor ID on reconciliation.
+- Sites currently using Heap should go to AB Tests → Settings → Visitor ID
+  Provider and select Heap after deploying. The default is Fingerprint.
+
 ## [1.5.0] - 2026-05-25
 
 ### Added
