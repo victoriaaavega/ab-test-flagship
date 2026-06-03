@@ -31,10 +31,12 @@ require_once ABTF_PLUGIN_DIR . 'includes/adapters/FlagshipAdapter.php';
 require_once ABTF_PLUGIN_DIR . 'includes/ExperimentRunner.php';
 
 // APIs, controllers, and UI
+require_once ABTF_PLUGIN_DIR . 'includes/ConversionTracker.php';
 require_once ABTF_PLUGIN_DIR . 'includes/RateLimiter.php';
 require_once ABTF_PLUGIN_DIR . 'includes/EventEndpoint.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/MetaBox.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/ExperimentsPage.php';
+require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/ReportingPage.php';
 require_once ABTF_PLUGIN_DIR . 'includes/AutoInjector.php';
 require_once ABTF_PLUGIN_DIR . 'includes/StatsRebuildJob.php';
 require_once ABTF_PLUGIN_DIR . 'includes/CronManager.php';
@@ -65,6 +67,7 @@ add_action('plugins_loaded', function (): void {
         new MetaBox();
         new ExperimentsPage();
         new Settings();
+        new ReportingPage();
     }
 });
 

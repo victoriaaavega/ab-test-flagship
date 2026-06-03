@@ -18,9 +18,9 @@
      * @param {number} attempt
      */
     function sendHit(experimentId, eventName, variant, attempt = 1) {
-        const MAX_ATTEMPTS = 3;
+        const MAX_ATTEMPTS   = 3;
         const RETRY_DELAY_MS = 1000;
-        const { visitorId } = window.abTestData;
+        const { visitorId }  = window.abTestData;
         const { apiUrl, nonce } = window.abtfConfig;
 
         fetch(apiUrl, {
@@ -30,10 +30,11 @@
                 'X-ABTF-Nonce': nonce
             },
             body: JSON.stringify({
-                visitor_id: visitorId,
+                visitor_id:    visitorId,
                 experiment_id: experimentId,
-                event_name: eventName,
-                variant: variant
+                event_name:    eventName,
+                variant:       variant,
+                page_url:      window.location.href,
             })
         })
             .then(function (response) {
@@ -82,7 +83,6 @@
 
             const variant = window.abTestData.experiments[config.experimentId];
 
-            // If the experiment ID is not in abTestData, skip registering the listener.
             if (variant === undefined || variant === null) {
                 console.warn('[AB Test] Variant not found for experiment:', config.experimentId);
                 return;

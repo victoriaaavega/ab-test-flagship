@@ -12,7 +12,7 @@ class Database
 {
 
     // Bump version to trigger dbDelta on schema changes
-    private const TABLE_VERSION = '1.2';
+    private const TABLE_VERSION = '1.3';
 
     /**
      * Creates the required tables only if they haven't been created yet
@@ -26,6 +26,7 @@ class Database
         $this->createAssignmentsTable();
         $this->createExperimentsTable();
         $this->createStatsTable();
+        $this->createConversionsStatsTable();
 
         update_option('ab_test_table_version', self::TABLE_VERSION);
     }
@@ -156,6 +157,41 @@ class Database
         PRIMARY KEY (id),
         UNIQUE KEY experiment_variant (experiment_id, variant)
     ) {$charset};";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta($sql);
+
+        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+    }
+
+    /**
+     * Creates the conversions stats table — a persistent backup of the
+     * real-time conversion counters held in Redis (DB 3).
+     *
+     * Redis is the live source of truth for the reporting dashboard; this
+     * table is a periodic snapshot written by StatsRebuildJob so data
+     * survives a Redis restart or outage.
+     *
+     * One row per experiment + variant + event combination.
+     */
+    private function createConversionsStatsTable(): void
+    {
+        global $wpdb;
+
+        $charset   = $wpdb->get_charset_collate();
+        $tableName = $wpdb->prefix . 'ab_test_conversions_stats';
+
+        $sql = "CREATE TABLE {$tableName} (
+            id                  BIGINT(20)   NOT NULL AUTO_INCREMENT,
+            experiment_id       VARCHAR(100) NOT NULL,
+            variant             VARCHAR(100) NOT NULL,
+            event_name          VARCHAR(100) NOT NULL,
+            unique_conversions  BIGINT(20)   NOT NULL DEFAULT 0,
+            total_conversions   BIGINT(20)   NOT NULL DEFAULT 0,
+            last_rebuilt_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY experiment_variant_event (experiment_id, variant, event_name)
+        ) {$charset};";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
