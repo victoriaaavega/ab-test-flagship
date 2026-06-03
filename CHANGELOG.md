@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-06-03
+
+### Added
+- ConversionTracker class — tracks conversion events in Redis (DB 3) for
+  real-time reporting at scale. Uses an INCR counter for total conversions and
+  a HyperLogLog (PFADD/PFCOUNT) for unique conversions, keeping memory flat
+  (~12 KB per key) regardless of traffic volume. Fails open if Redis is down.
+- ReportingPage class — Flagship-style conversions dashboard under AB Tests →
+  Reporting. Shows unique visitors, unique conversions, total conversions,
+  conversion rate, and growth vs. the control baseline, per experiment and
+  event. Reads live from Redis, falling back to the SQL snapshot when Redis
+  is unavailable.
+- wp_ab_test_conversions_stats table — persistent backup of the live Redis
+  conversion counters, written periodically by StatsRebuildJob.
+
+### Changed
+- EventEndpoint now records each conversion in Redis via ConversionTracker
+  after forwarding the hit to Flagship.
+- StatsRebuildJob now also snapshots Redis conversion counters into
+  wp_ab_test_conversions_stats, alongside the existing assignment stats rebuild.
+- Database TABLE_VERSION bumped to 1.3 to create wp_ab_test_conversions_stats.
+
 ## [1.6.0] - 2026-05-25
 
 ### Added
