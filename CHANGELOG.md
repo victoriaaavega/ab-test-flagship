@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-06-08
+
+### Added
+- FlagshipActivator class — sends activate hits directly to
+  decision.flagship.io/v2/activate via wp_remote_post. An activate hit exposes
+  the visitor to their assigned variation; it must precede conversion events
+  for those events to be attributed to the campaign in Flagship reporting.
+
+### Changed
+- DecisionAdapterInterface::decide() now returns an array
+  {variant, variationGroupId, variationId} instead of a plain variant string,
+  exposing the Flagship internal IDs needed to activate.
+- FlagshipAdapter reads variationGroupId and variationId from the flag metadata
+  and returns them alongside the variant.
+- ExperimentRunner sends an activate hit once per visitor per experiment,
+  deduplicated via a Redis SET NX guard. Variant + Flagship IDs are persisted
+  together so a returning visitor served from Redis can still be activated.
+- RedisClient now stores the assignment as JSON (variant + variationGroupId +
+  variationId), with backward-compatible reads for older bare-string entries.
+- SimulatorAdapter returns the new array shape with null Flagship IDs;
+  ExperimentRunner skips the activate when IDs are null.
+
+### Fixed
+- getValue() argument order in FlagshipAdapter. The Flagship PHP SDK signature
+  is getValue($defaultValue, $userExposed); the arguments were reversed, so the
+  SDK returned the boolean default (true), which cast to the string "1" and made
+  every variant appear as "1" regardless of the real assignment. Variants now
+  resolve to their real values (control / v1), consistent with the variation
+  metadata and the activate hit.
+
 ## [1.7.0] - 2026-06-03
 
 ### Added
