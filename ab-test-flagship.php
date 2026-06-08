@@ -28,6 +28,7 @@ require_once ABTF_PLUGIN_DIR . 'includes/Database.php';
 require_once ABTF_PLUGIN_DIR . 'includes/adapters/DecisionAdapterInterface.php';
 require_once ABTF_PLUGIN_DIR . 'includes/adapters/SimulatorAdapter.php';
 require_once ABTF_PLUGIN_DIR . 'includes/adapters/FlagshipAdapter.php';
+require_once ABTF_PLUGIN_DIR . 'includes/FlagshipActivator.php';
 require_once ABTF_PLUGIN_DIR . 'includes/ExperimentRunner.php';
 
 // APIs, controllers, and UI
