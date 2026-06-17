@@ -21,6 +21,13 @@ if (!defined('ABSPATH')) {
  *
  * Both use INSERT ... ON DUPLICATE KEY UPDATE instead of TRUNCATE + INSERT
  * to avoid a window where a stats table is empty between operations.
+ *
+ * Orphan cleanup (mark-and-sweep): each rebuild stamps every row it writes
+ * with a single timestamp captured at the start of that rebuild. After the
+ * upsert, any row whose last_rebuilt_at predates this run is an orphan — a
+ * variant/experiment/event combination that no longer exists in the live
+ * source — and is deleted. This keeps the SQL fallback faithful to live data
+ * without ever leaving the table empty (the upsert runs before the delete).
  */
 class StatsRebuildJob {
 
@@ -62,6 +69,11 @@ class StatsRebuildJob {
         $assignmentsTable = $wpdb->prefix . 'ab_test_assignments';
         $statsTable       = $wpdb->prefix . 'ab_test_stats';
 
+        // Single timestamp for the whole batch so mark-and-sweep is exact:
+        // every row written by this run shares it, and orphan cleanup can
+        // safely delete anything older without risking a partial-batch delete.
+        $rebuildAt = current_time('mysql', true); // UTC 'Y-m-d H:i:s'
+
         $rows = $wpdb->get_results(
             "SELECT experiment_id, variant, COUNT(*) as total
              FROM {$assignmentsTable}
@@ -84,10 +96,11 @@ class StatsRebuildJob {
         $values       = [];
 
         foreach ($rows as $row) {
-            $placeholders[] = '(%s, %s, %d, NOW())';
+            $placeholders[] = '(%s, %s, %d, %s)';
             $values[]       = $row['experiment_id'];
             $values[]       = $row['variant'];
             $values[]       = (int) $row['total'];
+            $values[]       = $rebuildAt;
         }
 
         $sql = $wpdb->prepare(
@@ -105,6 +118,22 @@ class StatsRebuildJob {
             $error = $wpdb->last_error ?: 'Unknown database error during assignment UPSERT.';
             error_log('[AB Test] StatsRebuildJob failed on assignment UPSERT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
+        }
+
+        // Sweep orphans: rows not refreshed by this rebuild no longer exist live.
+        $deleted = $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$statsTable} WHERE last_rebuilt_at < %s",
+                $rebuildAt
+            )
+        );
+
+        if ($deleted === false) {
+            // Non-fatal: the upsert already succeeded and the data is correct;
+            // only stale orphans may remain. Log and continue.
+            error_log('[AB Test] StatsRebuildJob: assignment orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
+        } elseif ($deleted > 0) {
+            error_log("[AB Test] StatsRebuildJob: swept {$deleted} orphan assignment-stat row(s).");
         }
 
         return ['rows_written' => (int) $result, 'error' => null];
@@ -134,16 +163,21 @@ class StatsRebuildJob {
         }
 
         $statsTable   = $wpdb->prefix . 'ab_test_conversions_stats';
+
+        // Single timestamp for the whole batch — see rebuildAssignmentStats().
+        $rebuildAt = current_time('mysql', true); // UTC 'Y-m-d H:i:s'
+
         $placeholders = [];
         $values       = [];
 
         foreach ($combos as $combo) {
-            $placeholders[] = '(%s, %s, %s, %d, %d, NOW())';
+            $placeholders[] = '(%s, %s, %s, %d, %d, %s)';
             $values[]       = $combo['experiment_id'];
             $values[]       = $combo['variant'];
             $values[]       = $combo['event_name'];
             $values[]       = (int) $combo['unique'];
             $values[]       = (int) $combo['total'];
+            $values[]       = $rebuildAt;
         }
 
         $sql = $wpdb->prepare(
@@ -163,6 +197,20 @@ class StatsRebuildJob {
             $error = $wpdb->last_error ?: 'Unknown database error during conversion UPSERT.';
             error_log('[AB Test] StatsRebuildJob failed on conversion UPSERT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
+        }
+
+        // Sweep orphans: conversion combos no longer present in Redis.
+        $deleted = $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$statsTable} WHERE last_rebuilt_at < %s",
+                $rebuildAt
+            )
+        );
+
+        if ($deleted === false) {
+            error_log('[AB Test] StatsRebuildJob: conversion orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
+        } elseif ($deleted > 0) {
+            error_log("[AB Test] StatsRebuildJob: swept {$deleted} orphan conversion-stat row(s).");
         }
 
         return ['rows_written' => (int) $result, 'error' => null];

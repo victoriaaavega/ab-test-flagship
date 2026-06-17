@@ -127,6 +127,11 @@ class ConversionTracker
      * Lists all tracked conversion combinations currently in Redis.
      * Uses SCAN (never KEYS) to avoid blocking Redis in production.
      *
+     * Reads are pipelined: a single round-trip fetches every total (GET) and
+     * every unique (PFCOUNT) at once, instead of 2N sequential round-trips.
+     * This matters when Redis is remote (e.g. Kinsta in production), where
+     * per-command latency would otherwise dominate the dashboard load time.
+     *
      * Returns an array of associative rows:
      *   [ ['experiment_id' => ..., 'variant' => ..., 'event_name' => ...,
      *      'total' => int, 'unique' => int], ... ]
@@ -142,6 +147,7 @@ class ConversionTracker
         }
 
         try {
+            // 1. Discover every combo via SCAN over the total-counter keys.
             $combos = [];
             $cursor = null;
             $match  = self::TOTAL_PREFIX . '*';
@@ -159,14 +165,37 @@ class ConversionTracker
                 }
             } while ($cursor !== 0 && $cursor !== null);
 
+            if (empty($combos)) {
+                return [];
+            }
+
+            // 2. Pipeline all reads: for each combo queue a GET (total) and a
+            //    PFCOUNT (unique) in deterministic order, then exec once.
+            $ordered  = array_values($combos);
+            $pipeline = $redis->multi(Redis::PIPELINE);
+
+            foreach ($ordered as $combo) {
+                $totalKey  = $this->buildKey(self::TOTAL_PREFIX, $combo['experiment_id'], $combo['variant'], $combo['event_name']);
+                $uniqueKey = $this->buildKey(self::UNIQUE_PREFIX, $combo['experiment_id'], $combo['variant'], $combo['event_name']);
+                $pipeline->get($totalKey);
+                $pipeline->pfCount($uniqueKey);
+            }
+
+            $replies = $pipeline->exec();
+
+            // 3. Map the flat replies back to combos. Two replies per combo,
+            //    in the same order they were queued: [total, unique, total, ...].
             $rows = [];
-            foreach ($combos as $combo) {
+            foreach ($ordered as $i => $combo) {
+                $totalReply  = $replies[$i * 2]       ?? false;
+                $uniqueReply = $replies[$i * 2 + 1]   ?? false;
+
                 $rows[] = [
                     'experiment_id' => $combo['experiment_id'],
                     'variant'       => $combo['variant'],
                     'event_name'    => $combo['event_name'],
-                    'total'         => $this->getTotal($combo['experiment_id'], $combo['variant'], $combo['event_name']),
-                    'unique'        => $this->getUnique($combo['experiment_id'], $combo['variant'], $combo['event_name']),
+                    'total'         => $totalReply !== false ? (int) $totalReply : 0,
+                    'unique'        => (int) $uniqueReply,
                 ];
             }
 

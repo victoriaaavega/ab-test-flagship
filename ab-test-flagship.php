@@ -3,7 +3,7 @@
 /**
  * Plugin Name: AB Test Flagship
  * Description: Server-side A/B testing using AB Tasty Flagship SDK
- * Version: 1.6.0
+ * Version: 1.8.0
  * Author: Victoria Vega
  * Requires PHP: 8.1
  */
@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ABTF_VERSION', '1.6.0');
+define('ABTF_VERSION', '1.8.0');
 define('ABTF_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ABTF_PLUGIN_URL', plugin_dir_url(__FILE__));
 

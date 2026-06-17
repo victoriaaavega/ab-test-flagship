@@ -107,7 +107,12 @@ class EventEndpoint
         $experimentId = $request->get_param('experiment_id');
         $eventName    = $request->get_param('event_name');
         $variant      = $request->get_param('variant');
-        $pageUrl      = $request->get_param('page_url') ?: home_url('/');
+        // Do NOT fall back to home_url(): attributing a conversion to the home
+        // page when the real page is unknown corrupts per-page reporting in
+        // Flagship. An absent URL is forwarded as an absent 'dl' field instead
+        // (see sendHitToFlagship) — a missing value is more honest than a wrong
+        // one. In practice event-tracker.js always sends window.location.href.
+        $pageUrl      = $request->get_param('page_url') ?: null;
 
         error_log("[AB Test] Event received. Experiment: {$experimentId}, Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
 
@@ -140,17 +145,19 @@ class EventEndpoint
      * Sends an EVENT hit to Flagship via the Universal Collect API.
      * Uses wp_remote_post() — no SDK initialization required.
      *
-     * @param string $visitorId
-     * @param string $eventName  Maps to the KPI name in the Flagship dashboard (ea)
-     * @param string $variant    Stored as the event label (el)
-     * @param string $pageUrl    The page where the event occurred (dl)
+     * @param string      $visitorId
+     * @param string      $eventName  Maps to the KPI name in the Flagship dashboard (ea)
+     * @param string      $variant    Stored as the event label (el)
+     * @param string|null $pageUrl    The page where the event occurred (dl).
+     *                                When null, 'dl' is omitted from the payload
+     *                                rather than sent as a misleading fallback.
      * @return array{success: bool, message: string}
      */
     private function sendHitToFlagship(
         string $visitorId,
         string $eventName,
         string $variant,
-        string $pageUrl
+        ?string $pageUrl
     ): array {
         $envId = CredentialsManager::getEnvId();
 
@@ -163,13 +170,17 @@ class EventEndpoint
             't'   => 'EVENT',
             'cid' => $envId,
             'vid' => $visitorId,
-            'dl'  => $pageUrl,
             'ea'  => $eventName,
             'ec'  => 'Action Tracking',
             'el'  => $variant,
             'ev'  => 1,
             'ds'  => 'APP',
         ];
+
+        // Only include the document location when we actually know it.
+        if ($pageUrl !== null && $pageUrl !== '') {
+            $payload['dl'] = $pageUrl;
+        }
 
         $response = wp_remote_post(self::FLAGSHIP_EVENTS_URL, [
             'headers' => ['Content-Type' => 'application/json'],
@@ -191,7 +202,8 @@ class EventEndpoint
             return ['success' => false, 'message' => "Flagship returned status {$statusCode}."];
         }
 
-        error_log("[AB Test] Hit sent to Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}, Page: {$pageUrl}");
+        $loggedUrl = $pageUrl ?? '(none)';
+        error_log("[AB Test] Hit sent to Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}, Page: {$loggedUrl}");
 
         return ['success' => true, 'message' => 'Hit sent successfully.'];
     }

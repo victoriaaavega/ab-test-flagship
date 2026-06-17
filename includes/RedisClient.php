@@ -24,6 +24,7 @@ class RedisClient {
     private const REDIS_HOST    = '127.0.0.1';
     private const REDIS_PORT    = 6379;
     private const REDIS_TIMEOUT = 0.05; // 50ms
+    private const REDIS_DB      = 0;     // variant assignments live in DB 0
     private const VARIANT_TTL   = 60 * 60 * 24 * 30; // 30 days
     private const ACTIVATED_TTL = 60 * 60 * 24 * 30; // 30 days
 
@@ -42,7 +43,12 @@ class RedisClient {
             return $pong === true || $pong === '+PONG';
         } catch (Exception $e) {
             error_log('[AB Test] Redis ping failed: ' . $e->getMessage());
-            self::$failed = true;
+            // Keep state coherent: a failed connection means no usable instance.
+            // Otherwise $instance would linger pointing at a dead socket while
+            // $failed says there is no connection — a contradiction that a
+            // future reconnect path or a reader trusting $instance could trip on.
+            self::$failed   = true;
+            self::$instance = null;
             return false;
         }
     }
@@ -160,7 +166,11 @@ class RedisClient {
     }
 
     /**
-     * Returns a single shared Redis connection for the entire request lifecycle
+     * Returns a single shared Redis connection for the entire request lifecycle.
+     * Selects DB 0 explicitly so the connection never depends on Redis' default
+     * database, matching the explicit select() that ConversionTracker does for
+     * DB 3. Without this, a misconfigured server default could silently route
+     * variant reads/writes to the wrong database.
      */
     private function getConnection(): ?Redis {
         if (self::$failed) {
@@ -174,6 +184,7 @@ class RedisClient {
         try {
             $redis = new Redis();
             $redis->connect(self::REDIS_HOST, self::REDIS_PORT, self::REDIS_TIMEOUT);
+            $redis->select(self::REDIS_DB);
             self::$instance = $redis;
             return self::$instance;
         } catch (Exception $e) {
