@@ -27,7 +27,9 @@ class ReportingPage
 
     public function __construct()
     {
-        add_action('admin_menu', [$this, 'addMenuPage']);
+        add_action('admin_menu',    [$this, 'addMenuPage']);
+        add_action('admin_init',    [$this, 'handleWrites']);
+        add_action('admin_notices', [$this, 'renderNotice']);
     }
 
     public function addMenuPage(): void
@@ -39,6 +41,85 @@ class ReportingPage
             'manage_options',
             self::MENU_SLUG,
             [$this, 'renderPage']
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Write handler — hooked to admin_init (before HTML output, so redirects work)
+    //
+    // The Rebuild Stats button posts here. Rebuilding refreshes BOTH the
+    // assignment stats (visitor counts) and the conversion snapshot, so the
+    // button belongs with the data consumers (this page and the dashboard
+    // widget), not on the experiments-config page.
+    // -------------------------------------------------------------------------
+
+    public function handleWrites(): void
+    {
+        if (($_GET['page'] ?? '') !== self::MENU_SLUG) {
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            return;
+        }
+
+        $action = sanitize_key($_POST['abtf_action'] ?? '');
+
+        if ($action === 'rebuild_stats') {
+            $this->handleRebuildStats();
+        }
+    }
+
+    private function handleRebuildStats(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to perform this action.'), 403);
+        }
+
+        check_admin_referer('abtf_rebuild_stats');
+
+        $result = StatsRebuildJob::run();
+
+        $noticeKey  = $result['error'] === null ? 'stats_rebuilt' : 'stats_error';
+        $noticeType = $result['error'] === null ? 'success' : 'error';
+
+        wp_safe_redirect(add_query_arg([
+            'page'        => self::MENU_SLUG,
+            'abtf_notice' => $noticeKey,
+            'abtf_type'   => $noticeType,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    // -------------------------------------------------------------------------
+    // Notices
+    // -------------------------------------------------------------------------
+
+    private const NOTICE_MESSAGES = [
+        'stats_rebuilt' => 'Stats rebuilt successfully.',
+        'stats_error'   => 'Stats rebuild failed. Check error logs.',
+    ];
+
+    public function renderNotice(): void
+    {
+        $screen = get_current_screen();
+        if (!$screen || !str_contains($screen->id, self::MENU_SLUG)) {
+            return;
+        }
+
+        $key  = sanitize_key($_GET['abtf_notice'] ?? '');
+        $type = sanitize_key($_GET['abtf_type']   ?? 'success');
+
+        if ($key === '' || !isset(self::NOTICE_MESSAGES[$key])) {
+            return;
+        }
+
+        $type = in_array($type, ['success', 'error', 'warning'], true) ? $type : 'success';
+
+        printf(
+            '<div class="notice notice-%s is-dismissible"><p>%s</p></div>',
+            esc_attr($type),
+            esc_html(self::NOTICE_MESSAGES[$key])
         );
     }
 
@@ -60,6 +141,13 @@ class ReportingPage
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline">AB Test — Reporting</h1>
+            <form method="post" style="display:inline;">
+                <?php wp_nonce_field('abtf_rebuild_stats'); ?>
+                <input type="hidden" name="abtf_action" value="rebuild_stats">
+                <button type="submit" class="page-title-action">
+                    ↺ Rebuild Stats
+                </button>
+            </form>
             <hr class="wp-header-end">
 
             <?php $this->renderSourceNotice($source, $lastRebuiltAt); ?>

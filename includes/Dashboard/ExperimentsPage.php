@@ -89,8 +89,6 @@ class ExperimentsPage
         'invalid_id'    => 'Invalid experiment ID.',
         'not_found'     => 'Experiment not found.',
         'db_error'      => 'A database error occurred. Please try again.',
-        'stats_rebuilt' => 'Stats rebuilt successfully.',
-        'stats_error'   => 'Stats rebuild failed. Check error logs.',
     ];
 
     private function redirectUrl(array $queryArgs, string $noticeKey, string $noticeType = 'success'): string
@@ -152,7 +150,6 @@ class ExperimentsPage
             match ($postAction) {
                 'create'         => $this->handleCreate(),
                 'update'         => $this->handleUpdate(),
-                'rebuild_stats'  => $this->handleRebuildStats(),
                 default          => null,
             };
             return;
@@ -363,13 +360,6 @@ class ExperimentsPage
         <div class="wrap">
             <h1 class="wp-heading-inline">AB Test — Experiments</h1>
             <a href="<?php echo esc_url($addNewUrl); ?>" class="page-title-action">Add New</a>
-            <form method="post" style="display:inline;">
-                <?php wp_nonce_field('abtf_rebuild_stats'); ?>
-                <input type="hidden" name="abtf_action" value="rebuild_stats">
-                <button type="submit" class="page-title-action">
-                    ↺ Rebuild Stats
-                </button>
-            </form>
             <hr class="wp-header-end">
 
             <table class="wp-list-table widefat fixed striped table-view-list" style="margin-top: 16px;">
@@ -633,19 +623,5 @@ class ExperimentsPage
             esc_attr($style),
             esc_html($status)
         );
-    }
-
-    private function handleRebuildStats(): void
-    {
-        $this->requirePermission();
-        check_admin_referer('abtf_rebuild_stats');
-
-        $result = StatsRebuildJob::run();
-
-        $noticeKey  = $result['error'] === null ? 'stats_rebuilt' : 'stats_error';
-        $noticeType = $result['error'] === null ? 'success' : 'error';
-
-        wp_safe_redirect($this->redirectUrl([], $noticeKey, $noticeType));
-        exit;
     }
 }
