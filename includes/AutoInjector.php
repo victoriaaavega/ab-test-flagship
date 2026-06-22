@@ -27,7 +27,11 @@ class AutoInjector {
         }
 
         $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
-        $parsedUri  = parse_url($currentUri, PHP_URL_PATH);
+        // parse_url() returns string on success, null when there is no path,
+        // or false on a malformed URL. matchUrl() requires a string, so fall
+        // back to '/' to avoid a TypeError on unusual request URIs (bots,
+        // fuzzing, rewriting proxies).
+        $parsedUri  = parse_url($currentUri, PHP_URL_PATH) ?: '/';
 
         $matchedExperiments = [];
 

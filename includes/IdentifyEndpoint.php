@@ -132,7 +132,17 @@ class IdentifyEndpoint
             $database->saveVariant($row->experiment_id, $hashedVisitorId, $row->variant);
 
             if ($redis->isAvailable()) {
-                $redis->saveVariant($row->experiment_id, $hashedVisitorId, $row->variant);
+                // FIXME(frozen): RedisClient has no saveVariant(); the correct
+                // method is saveAssignment(). The Flagship IDs are passed as null
+                // because this endpoint copies from the SQL assignments table,
+                // which only stores the variant — not variationGroupId/variationId.
+                // Consequence: a reconciled visitor is stored in Redis without
+                // Flagship IDs, so ExperimentRunner will skip their activate hit
+                // on the next visit. Acceptable for now (they still see the right
+                // variant); revisit when the visitor-ID flow is unfrozen and the
+                // team decides whether to keep fingerprint. Copying the full
+                // assignment from Redis (which has the IDs) is the proper fix.
+                $redis->saveAssignment($row->experiment_id, $hashedVisitorId, $row->variant, null, null);
             }
 
             $copied++;
