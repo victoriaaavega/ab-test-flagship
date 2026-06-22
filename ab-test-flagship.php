@@ -18,6 +18,7 @@ define('ABTF_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Dependencies and utilities
 require_once ABTF_PLUGIN_DIR . 'vendor/autoload.php';
+require_once ABTF_PLUGIN_DIR . 'includes/Logger.php';
 require_once ABTF_PLUGIN_DIR . 'includes/VisitorIdProvider.php';
 require_once ABTF_PLUGIN_DIR . 'includes/Fingerprint.php';
 require_once ABTF_PLUGIN_DIR . 'includes/RedisClient.php';

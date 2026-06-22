@@ -58,7 +58,7 @@ class RateLimiter {
         }
 
         if (!$this->available || $this->redis === null) {
-            error_log('[AB Test] RateLimiter: Redis unavailable, failing open.');
+            Logger::debug('RateLimiter: Redis unavailable, failing open.');
             return true;
         }
 
@@ -71,21 +71,21 @@ class RateLimiter {
             );
 
             if ($count === false) {
-                error_log('[AB Test] RateLimiter: eval returned false, failing open.');
+                Logger::debug('RateLimiter: eval returned false, failing open.');
                 return true;
             }
 
             $allowed = (int) $count <= self::MAX_REQUESTS;
 
             if (!$allowed) {
-                error_log("[AB Test] RateLimiter: IP {$hash} exceeded limit ({$count}/" . self::MAX_REQUESTS . " in " . self::WINDOW_SECONDS . "s).");
+                Logger::info("RateLimiter: IP {$hash} exceeded limit ({$count}/" . self::MAX_REQUESTS . " in " . self::WINDOW_SECONDS . "s).");
             }
 
             self::$cache[$hash] = $allowed;
             return $allowed;
 
         } catch (Exception $e) {
-            error_log('[AB Test] RateLimiter error: ' . $e->getMessage() . ' — failing open.');
+            Logger::debug('RateLimiter error: ' . $e->getMessage() . ' — failing open.');
             return true;
         }
     }
@@ -110,7 +110,7 @@ class RateLimiter {
             $this->redis->connect(self::REDIS_HOST, self::REDIS_PORT, self::REDIS_TIMEOUT);
             $this->redis->select(self::REDIS_DB);
         } catch (Exception $e) {
-            error_log('[AB Test] RateLimiter connection failed: ' . $e->getMessage());
+            Logger::error('RateLimiter connection failed: ' . $e->getMessage());
             $this->available = false;
             $this->redis     = null;
         }

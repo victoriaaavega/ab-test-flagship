@@ -41,7 +41,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
         $apiKey = CredentialsManager::getApiKey();
 
         if ($envId === null || $apiKey === null) {
-            error_log('[AB Test] FlagshipAdapter: credentials not found.');
+            Logger::error('FlagshipAdapter: credentials not found.');
             return;
         }
 
@@ -71,7 +71,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
     public function decide(string $visitorId, string $experimentId): array
     {
         if (!CredentialsManager::hasCredentials()) {
-            error_log('[AB Test] FlagshipAdapter: no credentials, serving control.');
+            Logger::error('FlagshipAdapter: no credentials, serving control.');
             return $this->controlResult();
         }
 
@@ -84,7 +84,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
             $flag = $visitor->getFlag($experimentId);
 
             if (!$flag->exists()) {
-                error_log("[AB Test] Flag '{$experimentId}' not found in Flagship. Serving control.");
+                Logger::error("Flag '{$experimentId}' not found in Flagship. Serving control.");
                 return $this->controlResult();
             }
 
@@ -99,7 +99,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
             $variationGroupId = $metadata->getVariationGroupId() ?: null;
             $variationId      = $metadata->getVariationId() ?: null;
 
-            error_log("[AB Test] Flagship decision for '{$experimentId}': {$value} (vg: {$variationGroupId}, v: {$variationId})");
+            Logger::debug("Flagship decision for '{$experimentId}': {$value} (vg: {$variationGroupId}, v: {$variationId})");
 
             return [
                 'variant'          => $value,
@@ -107,7 +107,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
                 'variationId'      => $variationId,
             ];
         } catch (\Exception $e) {
-            error_log('[AB Test] Flagship error: ' . $e->getMessage() . '. Serving control.');
+            Logger::error('Flagship error: ' . $e->getMessage() . '. Serving control.');
             return $this->controlResult();
         }
     }

@@ -27,7 +27,7 @@ class SimulatorAdapter implements DecisionAdapterInterface {
         $bucket  = abs(crc32($visitorId . $experimentId)) % 100;
         $variant = $bucket < 50 ? 'control' : 'variation_b';
 
-        error_log("[AB Test] SimulatorAdapter decision for '{$experimentId}': {$variant} (bucket: {$bucket})");
+        Logger::debug("SimulatorAdapter decision for '{$experimentId}': {$variant} (bucket: {$bucket})");
 
         return [
             'variant'          => $variant,

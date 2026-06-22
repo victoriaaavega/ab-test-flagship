@@ -49,7 +49,7 @@ class StatsRebuildJob {
 
         $rowsWritten = $assignments['rows_written'] + $conversions['rows_written'];
 
-        error_log("[AB Test] StatsRebuildJob completed. Assignment rows: {$assignments['rows_written']}, Conversion rows: {$conversions['rows_written']}, Duration: {$durationMs}ms.");
+        Logger::info("StatsRebuildJob completed. Assignment rows: {$assignments['rows_written']}, Conversion rows: {$conversions['rows_written']}, Duration: {$durationMs}ms.");
 
         return [
             'rows_written' => $rowsWritten,
@@ -83,12 +83,12 @@ class StatsRebuildJob {
 
         if ($rows === null) {
             $error = $wpdb->last_error ?: 'Unknown database error during assignment SELECT.';
-            error_log('[AB Test] StatsRebuildJob failed on assignment SELECT: ' . $error);
+            Logger::error('StatsRebuildJob failed on assignment SELECT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
         }
 
         if (empty($rows)) {
-            error_log('[AB Test] StatsRebuildJob: no assignment data found, nothing to write.');
+            Logger::info('StatsRebuildJob: no assignment data found, nothing to write.');
             return ['rows_written' => 0, 'error' => null];
         }
 
@@ -116,7 +116,7 @@ class StatsRebuildJob {
 
         if ($result === false) {
             $error = $wpdb->last_error ?: 'Unknown database error during assignment UPSERT.';
-            error_log('[AB Test] StatsRebuildJob failed on assignment UPSERT: ' . $error);
+            Logger::error('StatsRebuildJob failed on assignment UPSERT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
         }
 
@@ -131,9 +131,9 @@ class StatsRebuildJob {
         if ($deleted === false) {
             // Non-fatal: the upsert already succeeded and the data is correct;
             // only stale orphans may remain. Log and continue.
-            error_log('[AB Test] StatsRebuildJob: assignment orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
+            Logger::error('StatsRebuildJob: assignment orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
         } elseif ($deleted > 0) {
-            error_log("[AB Test] StatsRebuildJob: swept {$deleted} orphan assignment-stat row(s).");
+            Logger::info("StatsRebuildJob: swept {$deleted} orphan assignment-stat row(s).");
         }
 
         return ['rows_written' => (int) $result, 'error' => null];
@@ -151,14 +151,14 @@ class StatsRebuildJob {
         $tracker = new ConversionTracker();
 
         if (!$tracker->isAvailable()) {
-            error_log('[AB Test] StatsRebuildJob: Redis unavailable, skipping conversion snapshot.');
+            Logger::info('StatsRebuildJob: Redis unavailable, skipping conversion snapshot.');
             return ['rows_written' => 0, 'error' => null];
         }
 
         $combos = $tracker->listAll();
 
         if (empty($combos)) {
-            error_log('[AB Test] StatsRebuildJob: no conversion data in Redis, nothing to write.');
+            Logger::info('StatsRebuildJob: no conversion data in Redis, nothing to write.');
             return ['rows_written' => 0, 'error' => null];
         }
 
@@ -195,7 +195,7 @@ class StatsRebuildJob {
 
         if ($result === false) {
             $error = $wpdb->last_error ?: 'Unknown database error during conversion UPSERT.';
-            error_log('[AB Test] StatsRebuildJob failed on conversion UPSERT: ' . $error);
+            Logger::error('StatsRebuildJob failed on conversion UPSERT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
         }
 
@@ -208,9 +208,9 @@ class StatsRebuildJob {
         );
 
         if ($deleted === false) {
-            error_log('[AB Test] StatsRebuildJob: conversion orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
+            Logger::error('StatsRebuildJob: conversion orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
         } elseif ($deleted > 0) {
-            error_log("[AB Test] StatsRebuildJob: swept {$deleted} orphan conversion-stat row(s).");
+            Logger::info("StatsRebuildJob: swept {$deleted} orphan conversion-stat row(s).");
         }
 
         return ['rows_written' => (int) $result, 'error' => null];

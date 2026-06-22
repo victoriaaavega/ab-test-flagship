@@ -172,6 +172,16 @@ class ConversionTracker
             // 2. Pipeline all reads: for each combo queue a GET (total) and a
             //    PFCOUNT (unique) in deterministic order, then exec once.
             $ordered  = array_values($combos);
+
+            // Deterministic order so the dashboard lists variants the same way
+            // on every load. SCAN returns combos in arbitrary order, which made
+            // e.g. v1 sometimes appear above control. Sort by experiment, then
+            // event, then variant — with the 'control' baseline always first.
+            usort($ordered, static function (array $a, array $b): int {
+                return [$a['experiment_id'], $a['event_name'], $a['variant'] === 'control' ? 0 : 1, $a['variant']]
+                   <=> [$b['experiment_id'], $b['event_name'], $b['variant'] === 'control' ? 0 : 1, $b['variant']];
+            });
+
             $pipeline = $redis->multi(Redis::PIPELINE);
 
             foreach ($ordered as $combo) {
