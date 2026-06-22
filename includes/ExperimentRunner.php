@@ -25,6 +25,18 @@ class ExperimentRunner {
     private Database $database;
     private DecisionAdapterInterface $adapter;
     private FlagshipActivator $activator;
+
+    /**
+     * Guards the once-per-request cache-bypass header send. Static so the
+     * "once" is shared across every ExperimentRunner instance on the same
+     * page (multiple experiments must not each re-send headers).
+     *
+     * In production this is safe: each web request is a fresh PHP process, so
+     * the flag starts false and dies with the request. In a long-lived process
+     * (PHPUnit, WP-CLI) it persists across simulated requests, so headers are
+     * sent only on the first one. Tests that need a clean slate must call
+     * resetBootstrap() in their setUp().
+     */
     private static bool $bootstrapped = false;
 
     public function __construct(DecisionAdapterInterface $adapter) {
@@ -52,7 +64,7 @@ class ExperimentRunner {
         if ($this->redis->isAvailable()) {
             $result = $this->handleWithRedis($experimentId, $visitorId);
         } else {
-            error_log("[AB Test] Redis unavailable, falling back to database. Experiment: {$experimentId}");
+            Logger::debug("Redis unavailable, falling back to database. Experiment: {$experimentId}");
             $result = $this->handleWithDatabase($experimentId, $visitorId);
         }
 
@@ -80,7 +92,7 @@ class ExperimentRunner {
         $stored = $this->redis->getAssignment($experimentId, $visitorId);
 
         if ($stored !== null) {
-            error_log("[AB Test] Returning visitor from Redis. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$stored['variant']}");
+            Logger::debug("Returning visitor from Redis. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$stored['variant']}");
             return $this->buildResult($experimentId, $visitorId, $stored['variant'], 'redis', $stored['variationGroupId'], $stored['variationId']);
         }
 
@@ -89,7 +101,7 @@ class ExperimentRunner {
         $this->redis->saveAssignment($experimentId, $visitorId, $decision['variant'], $decision['variationGroupId'], $decision['variationId']);
         $this->database->saveVariant($experimentId, $visitorId, $decision['variant']);
 
-        error_log("[AB Test] New visitor assigned. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
+        Logger::debug("New visitor assigned. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
         return $this->buildResult($experimentId, $visitorId, $decision['variant'], 'redis', $decision['variationGroupId'], $decision['variationId']);
     }
 
@@ -103,7 +115,7 @@ class ExperimentRunner {
         $variant = $this->database->getVariant($experimentId, $visitorId);
 
         if ($variant !== null) {
-            error_log("[AB Test] Returning visitor from database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
+            Logger::debug("Returning visitor from database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
             return $this->buildResult($experimentId, $visitorId, $variant, 'database', null, null);
         }
 
@@ -111,7 +123,7 @@ class ExperimentRunner {
 
         $this->database->saveVariant($experimentId, $visitorId, $decision['variant']);
 
-        error_log("[AB Test] New visitor assigned to database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
+        Logger::debug("New visitor assigned to database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
         return $this->buildResult($experimentId, $visitorId, $decision['variant'], 'database', $decision['variationGroupId'], $decision['variationId']);
     }
 
@@ -174,5 +186,17 @@ class ExperimentRunner {
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
         header('Expires: 0');
+    }
+
+    /**
+     * Resets the per-request bootstrap guard.
+     *
+     * Production never calls this — each web request is a fresh process, so the
+     * static flag is already false. It exists for long-lived processes (PHPUnit,
+     * WP-CLI) where the flag would otherwise leak across simulated requests and
+     * suppress the cache-bypass headers after the first one. Call from setUp().
+     */
+    public static function resetBootstrap(): void {
+        self::$bootstrapped = false;
     }
 }

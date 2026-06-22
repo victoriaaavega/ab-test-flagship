@@ -56,7 +56,7 @@ class MetaBox {
             <th style="text-align:left; padding:6px; border-bottom:1px solid #ddd;">Experiment</th>
             <th style="text-align:left; padding:6px; border-bottom:1px solid #ddd;">Variant</th>
             <th style="text-align:left; padding:6px; border-bottom:1px solid #ddd;">Visitors</th>
-            <th style="text-align:left; padding:6px; border-bottom:1px solid #ddd;">%</th>
+            <th style="text-align:left; padding:6px; border-bottom:1px solid #ddd;">Traffic Split</th>
           </tr></thead>';
         echo '<tbody>';
 
@@ -77,10 +77,21 @@ class MetaBox {
 
         echo '</tbody></table>';
 
+        // Clarify what this percentage means, so it is not confused with the
+        // conversion rate shown on the Reporting page. Here the percentage is
+        // the share of visitors assigned to each variant (traffic allocation),
+        // not how many of them converted.
+        echo '<p style="margin-top:10px; color:#666; font-size:12px;">';
+        echo 'Traffic Split = share of visitors assigned to each variant. ';
+        echo 'For conversion rates, see AB Tests → Reporting.';
+        echo '</p>';
+
         // Show freshness info
         if ($lastRebuiltAt) {
+            $reportingUrl = admin_url('admin.php?page=abtf-reporting');
             echo '<p style="margin-top:12px; color:#666; font-size:12px;">';
-            echo 'Last rebuilt: ' . esc_html($lastRebuiltAt) . ' (UTC). Updates every 8 hours.';
+            echo 'Last rebuilt: ' . esc_html($lastRebuiltAt) . ' (UTC). Updates every 8 hours. ';
+            echo '<a href="' . esc_url($reportingUrl) . '">Refresh now</a>';
             echo '</p>';
         }
     }

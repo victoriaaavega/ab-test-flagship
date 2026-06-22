@@ -36,7 +36,7 @@ class FlagshipActivator
         $envId = CredentialsManager::getEnvId();
 
         if ($envId === null) {
-            error_log('[AB Test] FlagshipActivator: no credentials, activate skipped.');
+            Logger::error('FlagshipActivator: no credentials, activate skipped.');
             return false;
         }
 
@@ -47,14 +47,24 @@ class FlagshipActivator
             'vaid' => $variationId,
         ];
 
+        $body = wp_json_encode($payload);
+
+        // Guard against an unserializable payload (see EventEndpoint). A flat
+        // array of strings should always encode, but a false body would send
+        // an empty activate that Flagship cannot attribute.
+        if ($body === false) {
+            Logger::error('FlagshipActivator: failed to JSON-encode the activate payload. Activate not sent.');
+            return false;
+        }
+
         $response = wp_remote_post(self::ACTIVATE_URL, [
             'headers' => ['Content-Type' => 'application/json'],
-            'body'    => wp_json_encode($payload),
+            'body'    => $body,
             'timeout' => self::REQUEST_TIMEOUT,
         ]);
 
         if (is_wp_error($response)) {
-            error_log('[AB Test] FlagshipActivator failed (wp_error): ' . $response->get_error_message());
+            Logger::error('FlagshipActivator failed (wp_error): ' . $response->get_error_message());
             return false;
         }
 
@@ -63,11 +73,11 @@ class FlagshipActivator
         // The activate endpoint returns 204 No Content on success.
         if ($statusCode < 200 || $statusCode >= 300) {
             $body = wp_remote_retrieve_body($response);
-            error_log("[AB Test] FlagshipActivator failed. Status: {$statusCode}, Body: {$body}");
+            Logger::error("FlagshipActivator failed. Status: {$statusCode}, Body: {$body}");
             return false;
         }
 
-        error_log("[AB Test] Visitor activated. Visitor: {$visitorId}, caid: {$variationGroupId}, vaid: {$variationId}");
+        Logger::debug("Visitor activated. Visitor: {$visitorId}, caid: {$variationGroupId}, vaid: {$variationId}");
 
         return true;
     }

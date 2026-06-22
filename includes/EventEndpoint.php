@@ -114,7 +114,7 @@ class EventEndpoint
         // one. In practice event-tracker.js always sends window.location.href.
         $pageUrl      = $request->get_param('page_url') ?: null;
 
-        error_log("[AB Test] Event received. Experiment: {$experimentId}, Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
+        Logger::debug("Event received. Experiment: {$experimentId}, Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
 
         $result = $this->sendHitToFlagship($visitorId, $eventName, $variant, $pageUrl);
 
@@ -162,7 +162,7 @@ class EventEndpoint
         $envId = CredentialsManager::getEnvId();
 
         if ($envId === null) {
-            error_log('[AB Test] Flagship credentials not found. Hit not sent.');
+            Logger::error('Flagship credentials not found. Hit not sent.');
             return ['success' => false, 'message' => 'Flagship credentials not configured.'];
         }
 
@@ -182,15 +182,26 @@ class EventEndpoint
             $payload['dl'] = $pageUrl;
         }
 
+        $body = wp_json_encode($payload);
+
+        // wp_json_encode() returns false if the payload cannot be serialized.
+        // Our payload is a flat array of scalars so this should never happen,
+        // but guard anyway: sending body=false would silently post an empty
+        // hit to Flagship. Abort with a clear error instead.
+        if ($body === false) {
+            Logger::error('EventEndpoint: failed to JSON-encode the hit payload. Hit not sent.');
+            return ['success' => false, 'message' => 'Failed to encode hit payload.'];
+        }
+
         $response = wp_remote_post(self::FLAGSHIP_EVENTS_URL, [
             'headers' => ['Content-Type' => 'application/json'],
-            'body'    => wp_json_encode($payload),
+            'body'    => $body,
             'timeout' => self::REQUEST_TIMEOUT,
         ]);
 
         if (is_wp_error($response)) {
             $message = $response->get_error_message();
-            error_log("[AB Test] Flagship hit failed (wp_error): {$message}");
+            Logger::error("Flagship hit failed (wp_error): {$message}");
             return ['success' => false, 'message' => "Network error: {$message}"];
         }
 
@@ -198,12 +209,12 @@ class EventEndpoint
 
         if ($statusCode < 200 || $statusCode >= 300) {
             $body = wp_remote_retrieve_body($response);
-            error_log("[AB Test] Flagship hit failed. Status: {$statusCode}, Body: {$body}");
+            Logger::error("Flagship hit failed. Status: {$statusCode}, Body: {$body}");
             return ['success' => false, 'message' => "Flagship returned status {$statusCode}."];
         }
 
         $loggedUrl = $pageUrl ?? '(none)';
-        error_log("[AB Test] Hit sent to Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}, Page: {$loggedUrl}");
+        Logger::debug("Hit sent to Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}, Page: {$loggedUrl}");
 
         return ['success' => true, 'message' => 'Hit sent successfully.'];
     }
