@@ -51,6 +51,23 @@ class Database
 
     /**
      * Saves the assigned variant for a visitor and experiment.
+     *
+     * Uses INSERT IGNORE: the UNIQUE KEY (experiment_id, visitor_id) means a
+     * second save for the same visitor + experiment is silently dropped, which
+     * is the intended behaviour (the first assignment wins).
+     *
+     * Returns true ONLY when a new row was actually inserted. A duplicate that
+     * INSERT IGNORE discarded returns false — not because anything failed, but
+     * because nothing was written. This keeps the boolean honest: true means
+     * "a new assignment was stored", not merely "no SQL error".
+     *
+     * Rationale: $wpdb->query() returns 1 on insert, 0 when INSERT IGNORE drops
+     * a duplicate, and false on a real SQL error. The previous `!== false`
+     * check collapsed 1 and 0 into "success", so a duplicate reported true —
+     * a subtle lie for any caller that reads the result to mean "inserted".
+     *
+     * @return bool true if a new row was inserted; false if it already existed
+     *              or a SQL error occurred. SQL errors are logged.
      */
     public function saveVariant(string $experimentId, string $visitorId, string $variant): bool
     {
@@ -65,7 +82,13 @@ class Database
             )
         );
 
-        return $result !== false;
+        if ($result === false) {
+            error_log('[AB Test] Database saveVariant error: ' . ($wpdb->last_error ?: 'unknown'));
+            return false;
+        }
+
+        // 1 = inserted, 0 = ignored (duplicate). Honest "was it stored?".
+        return $result === 1;
     }
 
     private function getAssignmentsTableName(): string
