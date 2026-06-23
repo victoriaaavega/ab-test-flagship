@@ -16,6 +16,8 @@ PHP generates visitor ID
 Redis has variant? → Yes → serve it (< 1ms)
                   → No  → Flagship decides → save to Redis + DB
       ↓
+Activate hit → Flagship (once per visitor per experiment, dedup via Redis SET NX)
+      ↓
 PHP renders HTML with correct variant (no flicker)
       ↓
 JS registers click listeners
@@ -25,8 +27,10 @@ User clicks
       ↓
 JS sends POST to REST API endpoint
       ↓
-PHP validates nonce + rate limit → forwards hit to Flagship
+PHP records the conversion internally (Redis DB 3) → forwards hit to Flagship
 ```
+
+The activate hit exposes the visitor to their assigned variation and must precede conversion events so Flagship can attribute them in reporting. It is sent with a direct HTTP call (not the SDK pool), so a returning visitor served straight from Redis is still activated.
 
 ---
 
@@ -139,13 +143,18 @@ $visitorId = $result1['visitorId']; // same visitor ID across all experiments in
 
 ## Redis
 
-The plugin uses three Redis DB indexes to keep data separated:
+The plugin uses four Redis DB indexes to keep data separated:
 
 | DB | Purpose |
 |---|---|
-| 0 | Variant assignments (`ab_test:variant:{experimentId}:{visitorId}`) |
+| 0 | Variant assignments (`ab_test:variant:{experimentId}:{visitorId}`) and the activation guard (`ab_test:activated:{experimentId}:{visitorId}`) |
 | 1 | Hit cache for failed Flagship hits (auto-retry on next request) |
 | 2 | Rate limiter counters (`abtf:rate:{ip_hash}`) |
+| 3 | Conversion counters (`abtf:conv:total:` / `abtf:conv:unique:` + `{experimentId}:{variant}:{eventName}`) |
+
+DB 3 uses an `INCR` counter for total conversions and a HyperLogLog (`PFADD`/`PFCOUNT`) for unique conversions — roughly 12 KB fixed per key regardless of traffic volume.
+
+**Encoding note:** DB 0 stores spaces raw; DB 3 uses `rawurlencode` (space → `%20`). Each DB is consistent with itself. To delete DB 0 keys containing spaces from `redis-cli`, use `while IFS= read -r key`, not `xargs` (which breaks on spaces).
 
 **Variant TTL:** 30 days. If Redis is unavailable, the plugin falls back to the WordPress database automatically.
 
@@ -155,7 +164,7 @@ The plugin uses three Redis DB indexes to keep data separated:
 
 ### POST /wp-json/abtest/v1/event
 
-Receives click events from JavaScript and forwards them to Flagship.
+Records a conversion internally (Redis DB 3) and forwards the hit to Flagship.
 
 **Headers:**
 ```
@@ -169,11 +178,26 @@ X-ABTF-Nonce: {nonce injected automatically by the plugin}
     "visitor_id":    "64-char SHA256 hex string",
     "experiment_id": "your_flag_key",
     "event_name":    "your_event_name",
-    "variant":       "control"
+    "variant":       "control",
+    "page_url":      "https://example.com/page"
 }
 ```
 
-**Rate limiting:** 20 requests per IP per minute. Exceeding the limit returns `429 Too Many Requests`. The JS tracker does not retry on 4xx errors.
+**Response (HTTP 200):**
+```json
+{
+    "success":    true,
+    "flagship":   "sent",
+    "message":    "Conversion recorded.",
+    "experiment": "your_flag_key",
+    "event":      "your_event_name",
+    "variant":    "control"
+}
+```
+
+The internal recording is the endpoint's contract: `success: true` means the conversion was counted in the live dashboard. The `flagship` field reports the secondary delivery (`sent` / `failed` / `skipped`) without suppressing a conversion the user genuinely made — the internal channel is independent of Flagship. `success: false` only occurs when the internal store (Redis) is unavailable.
+
+**Rate limiting:** 20 requests per IP per minute. Exceeding the limit returns `429 Too Many Requests`. The JS tracker does not retry on 4xx errors (only on 5xx).
 
 ### POST /wp-json/abtest/v1/identify
 
@@ -191,6 +215,25 @@ Uses `INSERT IGNORE` — never overwrites existing assignments under the externa
 
 ---
 
+## Logging
+
+The plugin uses a central `Logger` class gated by the `ABTF_LOG_LEVEL` constant in `wp-config.php`:
+
+| Level | Logs |
+|---|---|
+| `error` (default) | Real errors only (Redis down, hit failed, decryption failed). Safe for production. |
+| `info` | Lifecycle events (stats rebuild completed). |
+| `debug` | Per-request detail (assignments, decisions). Verbose — development only. |
+
+```php
+define('ABTF_LOG_LEVEL', 'debug');   // development
+define('ABTF_LOG_LEVEL', 'error');   // production (or omit — error is the default)
+```
+
+All messages are prefixed `[AB Test]`.
+
+---
+
 ## File structure
 
 ```
@@ -203,24 +246,28 @@ ab-test-flagship/
 │       ├── event-tracker.js               ← captures events and sends hits (retry on 5xx only)
 │       └── visitor-sync.js                ← resolves external visitor ID, writes cookie, calls /identify on first write
 └── includes/
+    ├── Logger.php                         ← leveled logging gated by ABTF_LOG_LEVEL
     ├── VisitorIdProvider.php              ← manages provider config (fingerprint / heap / custom)
     ├── Fingerprint.php                    ← generates visitor ID from cookie or SHA256 fingerprint
     ├── RedisClient.php                    ← singleton Redis connection for variant assignments (DB 0)
     ├── Database.php                       ← DB fallback and table definitions
     ├── HitCacheRedis.php                  ← caches failed Flagship hits for retry (DB 1)
     ├── RateLimiter.php                    ← rate limiting via Redis DB 2 (Lua atomic, fail open)
+    ├── ConversionTracker.php              ← real-time conversion counters (Redis DB 3)
+    ├── FlagshipActivator.php              ← sends activate hits to Flagship (decision.flagship.io/v2/activate)
     ├── ExperimentRunner.php               ← orchestrates the full experiment flow
-    ├── EventEndpoint.php                  ← REST API endpoint for event tracking
+    ├── EventEndpoint.php                  ← REST API endpoint: records conversion + forwards hit
     ├── IdentifyEndpoint.php               ← REST API endpoint for fingerprint → external ID reconciliation
     ├── Encryption.php                     ← AES-256-CBC encryption using AUTH_KEY + AUTH_SALT
     ├── CredentialsManager.php             ← reads and caches Flagship credentials from wp_options
     ├── Settings.php                       ← admin settings page (credentials + visitor ID provider)
     ├── AutoInjector.php                   ← injects abTestData and abTestConfig into wp_footer (priority 99)
-    ├── StatsRebuildJob.php                ← aggregates assignments into stats table
+    ├── StatsRebuildJob.php                ← aggregates assignments into stats table + snapshots conversions
     ├── CronManager.php                    ← WP-Cron schedule for stats rebuild (every 8h)
     ├── Dashboard/
     │   ├── MetaBox.php                    ← admin dashboard widget with pre-calculated experiment stats
-    │   └── ExperimentsPage.php            ← experiments CRUD admin page
+    │   ├── ExperimentsPage.php            ← experiments CRUD admin page
+    │   └── ReportingPage.php              ← live conversions dashboard (Redis, SQL snapshot fallback)
     └── adapters/
         ├── DecisionAdapterInterface.php   ← contract for any decision engine
         ├── SimulatorAdapter.php           ← local deterministic 50/50 bucketing (no credentials needed)
@@ -231,8 +278,10 @@ ab-test-flagship/
 
 ## Admin pages
 
-**AB Tests → Experiments** — create, edit, pause, and delete experiments. Each experiment defines a flag key, CSS selector, event name, event type, and URL rules with wildcard support (e.g. `/talent/*`). Includes a Rebuild Stats button to force a stats refresh without waiting for the cron.
+**AB Tests → Experiments** — create, edit, pause, and delete experiments. Each experiment defines a flag key, CSS selector, event name, event type, and URL rules with wildcard support (e.g. `/talent/*`).
+
+**AB Tests → Reporting** — live conversions dashboard showing unique visitors, unique conversions, total conversions, conversion rate, and growth vs. the `control` baseline, per experiment and event. Reads live from Redis, falling back to the SQL snapshot when Redis is unavailable. Includes a Rebuild Stats button to force a stats refresh without waiting for the cron.
 
 **AB Tests → Settings** — configure Flagship credentials (encrypted with AES-256-CBC before being stored in `wp_options`) and the Visitor ID Provider.
 
-**WordPress Dashboard widget** — shows visitor counts and percentages per variant for each experiment. Data is pre-calculated by WP-Cron every 8 hours and never runs live `COUNT(*)` queries.
+**WordPress Dashboard widget** — shows visitor counts and traffic split per variant for each experiment. Data is pre-calculated by WP-Cron every 8 hours and never runs live `COUNT(*)` queries.
