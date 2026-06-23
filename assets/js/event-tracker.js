@@ -3,14 +3,26 @@
  *
  * Reads the experiment configuration defined in window.abTestConfig and registers
  * event listeners for each element. When an event is detected, it sends a hit to
- * the WordPress REST API endpoint which forwards it to Flagship.
+ * the WordPress REST API endpoint which records the conversion internally and
+ * forwards it to Flagship.
+ *
+ * Endpoint response shape (HTTP 200, our own payload):
+ *   { success: bool, flagship: 'sent'|'failed'|'skipped', message: string, ... }
+ *     - success  → the conversion was recorded internally (the real contract).
+ *     - flagship → outcome of the secondary, best-effort delivery to Flagship.
+ *                  A 'failed'/'skipped' flagship value does NOT mean the
+ *                  conversion was lost — it was still counted internally.
+ *
+ * WordPress-level errors (nonce, rate limit) use a different shape: { code, message }
+ * with a 4xx status, and must still be treated as a server rejection (no retry).
+ * Server errors (5xx) trigger the retry logic.
  */
 
 (function () {
 
     /**
      * Sends a hit event to the WordPress REST API endpoint.
-     * Retries up to 3 times if the request fails with a server error.
+     * Retries up to 3 times if the request fails with a server error (5xx).
      *
      * @param {string} experimentId
      * @param {string} eventName
@@ -44,11 +56,38 @@
                 return response.json();
             })
             .then(function (data) {
-                if (data.success === false || data.code) {
+                // WordPress-level rejection (nonce, rate limit, validation):
+                // these carry a `code` field and arrive with a 4xx status.
+                // Not retried — the client cannot fix them by retrying.
+                if (data.code) {
                     console.warn('[AB Test] Hit rejected by server:', data.message);
                     return;
                 }
-                console.log('[AB Test] Hit sent:', data);
+
+                // Our own payload. success === false means the conversion could
+                // NOT be recorded internally (e.g. Redis down) — a real problem
+                // worth surfacing, distinct from a server rejection.
+                if (data.success === false) {
+                    console.warn('[AB Test] Conversion not recorded internally:', data.message);
+                    return;
+                }
+
+                // Conversion recorded. Report the secondary Flagship outcome for
+                // visibility, without treating a Flagship miss as a failure of
+                // the conversion itself.
+                switch (data.flagship) {
+                    case 'sent':
+                        console.log('[AB Test] Conversion recorded. Flagship: sent.', data);
+                        break;
+                    case 'failed':
+                        console.warn('[AB Test] Conversion recorded, but Flagship delivery failed (counted internally).', data);
+                        break;
+                    case 'skipped':
+                        console.log('[AB Test] Conversion recorded. Flagship: skipped (no credentials).', data);
+                        break;
+                    default:
+                        console.log('[AB Test] Conversion recorded.', data);
+                }
             })
             .catch(function (error) {
                 console.error('[AB Test] Failed to send hit (attempt ' + attempt + '):', error);

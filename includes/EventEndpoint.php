@@ -10,6 +10,16 @@ if (!defined('ABSPATH')) {
  * using the Universal Collect API directly — no SDK initialization needed.
  *
  * Endpoint: POST /wp-json/abtest/v1/event
+ *
+ * Conversion recording is INDEPENDENT of Flagship. The internal conversion
+ * counters (ConversionTracker, Redis DB 3) feed the live Reporting dashboard,
+ * whose whole purpose is to avoid Flagship's reporting delay. A click is a real
+ * user action: it is recorded internally regardless of whether the secondary
+ * hit to Flagship succeeds, fails, or is skipped for lack of credentials.
+ *
+ * The response therefore reports two independent facts:
+ *   - success: did we record the conversion internally? (the endpoint's contract)
+ *   - flagship: did the secondary hit reach Flagship? ('sent'|'failed'|'skipped')
  */
 class EventEndpoint
 {
@@ -98,6 +108,12 @@ class EventEndpoint
     /**
      * Handles incoming event requests.
      *
+     * The internal conversion is recorded FIRST and independently of Flagship.
+     * That recording is the endpoint's real contract — it is what the live
+     * Reporting dashboard reads. The hit to Flagship is a best-effort secondary
+     * delivery: its outcome is reported in the 'flagship' field but never
+     * suppresses a conversion that the user genuinely made.
+     *
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
@@ -116,29 +132,60 @@ class EventEndpoint
 
         Logger::debug("Event received. Experiment: {$experimentId}, Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
 
-        $result = $this->sendHitToFlagship($visitorId, $eventName, $variant, $pageUrl);
+        // 1. Record the conversion internally FIRST — this is independent of
+        //    Flagship and feeds the live Reporting dashboard. Fails silently if
+        //    Redis is unavailable (fail-open); $recorded reflects the outcome.
+        $recorded = $this->conversionTracker->record($experimentId, $variant, $eventName, $visitorId);
 
-        if (!$result['success']) {
-            // Return 200 when credentials are simply not configured — not a server error.
-            $statusCode = str_contains($result['message'], 'credentials') ? 200 : 500;
-
-            return new WP_REST_Response([
-                'success' => false,
-                'message' => $result['message'],
-            ], $statusCode);
+        if (!$recorded) {
+            // Redis down (or record failed). The conversion could not be stored
+            // in the live counters. We still attempt Flagship below so the data
+            // is not lost entirely, but we report the internal failure honestly.
+            Logger::error("ConversionTracker did not record event. Experiment: {$experimentId}, Event: {$eventName} (Redis may be down).");
         }
 
-        // Record the conversion in Redis for real-time internal reporting.
-        // Independent of Flagship — fails silently if Redis is unavailable.
-        $this->conversionTracker->record($experimentId, $variant, $eventName, $visitorId);
+        // 2. Best-effort secondary delivery to Flagship. Never blocks or
+        //    invalidates the internal recording above.
+        $flagshipResult = $this->sendHitToFlagship($visitorId, $eventName, $variant, $pageUrl);
+        $flagshipStatus = $this->flagshipStatusLabel($flagshipResult);
 
+        // The endpoint's contract is the internal recording. success === true
+        // means the conversion is counted in the live dashboard.
         return new WP_REST_Response([
-            'success'    => true,
-            'message'    => 'Hit sent successfully.',
+            'success'    => $recorded,
+            'flagship'   => $flagshipStatus, // 'sent' | 'failed' | 'skipped'
+            'message'    => $recorded
+                ? 'Conversion recorded.'
+                : 'Conversion could not be recorded internally (storage unavailable).',
             'experiment' => $experimentId,
             'event'      => $eventName,
             'variant'    => $variant,
         ], 200);
+    }
+
+    /**
+     * Maps the Flagship send result to a short status label for the response.
+     *
+     *   'skipped' — credentials not configured, nothing was attempted.
+     *   'sent'    — Flagship accepted the hit (2xx).
+     *   'failed'  — network error or non-2xx response.
+     *
+     * @param array{success: bool, message: string} $result
+     * @return string
+     */
+    private function flagshipStatusLabel(array $result): string
+    {
+        if ($result['success']) {
+            return 'sent';
+        }
+
+        // Distinguish "no credentials" (an expected configuration state, not an
+        // error) from a genuine delivery failure.
+        if (str_contains($result['message'], 'credentials')) {
+            return 'skipped';
+        }
+
+        return 'failed';
     }
 
     /**
