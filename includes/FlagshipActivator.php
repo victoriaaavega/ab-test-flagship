@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 class FlagshipActivator
 {
     private const ACTIVATE_URL    = 'https://decision.flagship.io/v2/activate';
-    private const REQUEST_TIMEOUT = 5; // seconds
+    private const REQUEST_TIMEOUT = 3; // seconds
 
     /**
      * Sends an activate hit for a visitor + variation.

@@ -16,6 +16,20 @@ class AutoInjector {
     }
 
     public function injectScripts(): void {
+        // Safety guard: with no Flagship credentials configured, the plugin does
+        // NOT touch the visitor-facing page at all — no experiment script is
+        // injected, no decision is made, nothing is rendered. The site looks
+        // exactly as if the plugin were inactive. The admin still shows the
+        // "credentials not configured" notice so the cause is visible.
+        //
+        // This makes it impossible for the plugin to alter a real page before
+        // it has been deliberately configured. It also means the local
+        // SimulatorAdapter is never reached through auto-injection without
+        // credentials (intended: experiments only run against real Flagship).
+        if (!CredentialsManager::hasCredentials()) {
+            return;
+        }
+
         global $wpdb;
         $tableName = $wpdb->prefix . 'ab_test_experiments';
 
