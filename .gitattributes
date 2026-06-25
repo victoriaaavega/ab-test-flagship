@@ -1,0 +1,31 @@
+# Normalize line endings automatically for all text files.
+# Git stores LF internally and checks out the platform's native ending,
+# so Windows (CRLF) and macOS/Linux (LF) collaborators no longer produce
+# whole-file diffs just from saving.
+* text=auto
+
+# Explicitly declare text files and force LF on checkout for code, so the
+# repo stays consistent regardless of each contributor's editor settings.
+*.php   text eol=lf
+*.js    text eol=lf
+*.css   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.xml   text eol=lf
+*.neon  text eol=lf
+
+# Binary files: never normalize or diff as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
