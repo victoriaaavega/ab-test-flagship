@@ -15,9 +15,10 @@ if (!defined('ABSPATH')) {
  * page load onwards PHP finds the correct variant under the external ID without
  * making a new decision.
  *
- * The external visitor ID is hashed using the provider prefix defined in
- * VisitorIdProvider::getHashPrefix() so that IDs from different providers
- * (heap, custom) never collide even if their raw values match.
+ * The destination visitor ID is built the same way Fingerprint.php builds it
+ * on the next page load: raw for heap/custom, hashed only for fingerprint
+ * (decided by VisitorIdProvider::shouldHash()). This guarantees the copy lands
+ * on the exact key the next lookup will read from.
  *
  * Endpoint: POST /wp-json/abtest/v1/identify
  */
@@ -42,7 +43,12 @@ class IdentifyEndpoint
                     'required'          => true,
                     'type'              => 'string',
                     'sanitize_callback' => 'sanitize_text_field',
-                    'validate_callback' => fn($v) => !empty($v) && strlen($v) === 64 && ctype_xdigit($v),
+                    // Same safe pattern as EventEndpoint: bounded length and a
+                    // restricted character set, not tied to one ID format.
+                    'validate_callback' => fn($v) => is_string($v)
+                        && $v !== ''
+                        && strlen($v) <= 255
+                        && (bool) preg_match('/^[A-Za-z0-9_:-]+$/', $v),
                 ],
                 'external_visitor_id' => [
                     'required'          => true,
@@ -99,12 +105,16 @@ class IdentifyEndpoint
         $fingerprintVisitorId = $request->get_param('fingerprint_visitor_id');
         $externalVisitorId    = $request->get_param('external_visitor_id');
 
-        // Build the hashed visitor ID the same way Fingerprint.php does it.
-        $prefix          = VisitorIdProvider::getHashPrefix();
-        $hashedVisitorId = hash('sha256', $prefix . $externalVisitorId);
+        // Build the destination visitor ID exactly the way Fingerprint.php does
+        // on the next page load, so the reconciliation writes to the same key
+        // the lookup will later read from. Heap/custom use the raw ID; only
+        // fingerprint hashes (to protect the IP). These two must stay in sync.
+        $destinationVisitorId = VisitorIdProvider::shouldHash()
+            ? hash('sha256', VisitorIdProvider::getHashPrefix() . $externalVisitorId)
+            : $externalVisitorId;
 
-        // If both IDs resolve to the same hash, nothing to do.
-        if ($fingerprintVisitorId === $hashedVisitorId) {
+        // If both IDs are already the same, nothing to do.
+        if ($fingerprintVisitorId === $destinationVisitorId) {
             return new WP_REST_Response(['success' => true, 'copied' => 0], 200);
         }
 
@@ -129,7 +139,7 @@ class IdentifyEndpoint
 
         foreach ($assignments as $row) {
             // INSERT IGNORE ensures we never overwrite an existing external ID assignment.
-            $database->saveVariant($row->experiment_id, $hashedVisitorId, $row->variant);
+            $database->saveVariant($row->experiment_id, $destinationVisitorId, $row->variant);
 
             if ($redis->isAvailable()) {
                 // FIXME(frozen): RedisClient has no saveVariant(); the correct
@@ -142,13 +152,13 @@ class IdentifyEndpoint
                 // variant); revisit when the visitor-ID flow is unfrozen and the
                 // team decides whether to keep fingerprint. Copying the full
                 // assignment from Redis (which has the IDs) is the proper fix.
-                $redis->saveAssignment($row->experiment_id, $hashedVisitorId, $row->variant, null, null);
+                $redis->saveAssignment($row->experiment_id, $destinationVisitorId, $row->variant, null, null);
             }
 
             $copied++;
         }
 
-        error_log("[AB Test] IdentifyEndpoint: copied {$copied} assignment(s) from fingerprint {$fingerprintVisitorId} to external visitor {$hashedVisitorId} (prefix: '{$prefix}').");
+        error_log("[AB Test] IdentifyEndpoint: copied {$copied} assignment(s) from fingerprint {$fingerprintVisitorId} to external visitor {$destinationVisitorId}.");
 
         return new WP_REST_Response(['success' => true, 'copied' => $copied], 200);
     }

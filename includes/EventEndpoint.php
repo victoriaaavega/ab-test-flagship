@@ -47,7 +47,14 @@ class EventEndpoint
                     'required'          => true,
                     'type'              => 'string',
                     'sanitize_callback' => 'sanitize_text_field',
-                    'validate_callback' => fn($v) => !empty($v) && strlen($v) === 64 && ctype_xdigit($v),
+                    // Accepts any provider's ID format: a 64-char fingerprint hash,
+                    // a raw Heap userId (e.g. 16 digits), or a custom ID. Not tied
+                    // to a single format, but still bounded in length and limited
+                    // to a safe character set to protect this public endpoint.
+                    'validate_callback' => fn($v) => is_string($v)
+                        && $v !== ''
+                        && strlen($v) <= 255
+                        && (bool) preg_match('/^[A-Za-z0-9_:-]+$/', $v),
                 ],
                 'experiment_id' => [
                     'required'          => true,

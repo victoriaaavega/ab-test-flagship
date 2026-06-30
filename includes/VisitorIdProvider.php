@@ -102,6 +102,26 @@ class VisitorIdProvider
     }
 
     /**
+     * Returns whether the active provider's visitor ID must be hashed before use.
+     *
+     * Only fingerprint hashes: it processes the visitor's IP address, so the
+     * raw value is personal data that must never be stored or sent in clear.
+     * The SHA256 makes it irreversible.
+     *
+     * Heap and custom send the RAW ID. The ID that reaches Flagship must match
+     * exactly the ID the team's own integration sends to AB Tasty (the raw Heap
+     * userId), otherwise the same human is counted as two visitors in the
+     * reports. These providers already supply an opaque identifier, so hashing
+     * adds no privacy benefit — only a mismatch.
+     *
+     * @return bool True for fingerprint, false for heap/custom.
+     */
+    public static function shouldHash(): bool
+    {
+        return self::getProvider() === self::PROVIDER_FINGERPRINT;
+    }
+
+    /**
      * Saves the provider configuration to wp_options.
      * For heap, js_path is hardcoded. For custom, it must be provided.
      *

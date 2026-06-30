@@ -9,20 +9,24 @@ if (!defined('ABSPATH')) {
  *
  * Priority:
  *   1. External provider cookie (abtf_visitor_id) — written by visitor-sync.js
- *      when the active provider is 'heap' or 'custom'. The raw value is prefixed
- *      with the provider slug before hashing so IDs never collide across providers.
+ *      when the active provider is 'heap' or 'custom'. The raw value is returned
+ *      as-is, so the ID that reaches Flagship matches exactly the one the team's
+ *      own integration sends to AB Tasty (avoiding duplicate visitors).
  *   2. Fingerprint fallback — SHA256 of IP + User-Agent + Accept-Language. Used
  *      when provider is 'fingerprint', or on the very first visit before
  *      visitor-sync.js has written the cookie.
  *
- * Both paths produce a 64-char hex SHA256 string, so nothing downstream changes.
+ * Whether the external ID is hashed is decided by VisitorIdProvider::shouldHash():
+ * fingerprint hashes (to protect the IP), heap/custom return the raw ID. As a
+ * result the returned ID is NOT always a 64-char hex string anymore — heap
+ * returns Heap's own format (e.g. a 16-digit numeric userId).
  */
 class Fingerprint
 {
     /**
      * Returns the visitor ID based on the active provider configuration.
      *
-     * @return string 64-char SHA256 hex string
+     * @return string SHA256 hex (fingerprint) or the raw external ID (heap/custom).
      */
     public function generateVisitorId(): string
     {
@@ -30,8 +34,14 @@ class Fingerprint
             $externalId = $this->readVisitorCookie();
 
             if ($externalId !== null) {
-                $prefix = VisitorIdProvider::getHashPrefix();
-                return hash('sha256', $prefix . $externalId);
+                // Heap/custom return the RAW external ID so it matches exactly
+                // the ID the team's own integration sends to AB Tasty. Hashing is
+                // reserved for fingerprint, where it protects the visitor's IP.
+                if (VisitorIdProvider::shouldHash()) {
+                    return hash('sha256', VisitorIdProvider::getHashPrefix() . $externalId);
+                }
+
+                return $externalId;
             }
 
             // Cookie not yet written — fall through to fingerprint for this request.
