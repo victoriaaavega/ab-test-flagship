@@ -136,23 +136,27 @@ class IdentifyEndpoint
         $database = new Database();
         $redis    = new RedisClient();
         $copied   = 0;
+        $redisUp  = $redis->isAvailable();
 
         foreach ($assignments as $row) {
             // INSERT IGNORE ensures we never overwrite an existing external ID assignment.
             $database->saveVariant($row->experiment_id, $destinationVisitorId, $row->variant);
 
-            if ($redis->isAvailable()) {
-                // FIXME(frozen): RedisClient has no saveVariant(); the correct
-                // method is saveAssignment(). The Flagship IDs are passed as null
-                // because this endpoint copies from the SQL assignments table,
-                // which only stores the variant — not variationGroupId/variationId.
-                // Consequence: a reconciled visitor is stored in Redis without
-                // Flagship IDs, so ExperimentRunner will skip their activate hit
-                // on the next visit. Acceptable for now (they still see the right
-                // variant); revisit when the visitor-ID flow is unfrozen and the
-                // team decides whether to keep fingerprint. Copying the full
-                // assignment from Redis (which has the IDs) is the proper fix.
-                $redis->saveAssignment($row->experiment_id, $destinationVisitorId, $row->variant, null, null);
+            if ($redisUp) {
+                // Copy the FULL assignment (variant + Flagship IDs) so the
+                // reconciled visitor can still be activated on their next visit.
+                // The Flagship IDs live only in Redis (the SQL table stores the
+                // variant alone), so we read them from the fingerprint's Redis
+                // entry and carry them over to the destination ID.
+                $source = $redis->getAssignment($row->experiment_id, $fingerprintVisitorId);
+
+                $redis->saveAssignment(
+                    $row->experiment_id,
+                    $destinationVisitorId,
+                    $row->variant,
+                    $source['variationGroupId'] ?? null,
+                    $source['variationId'] ?? null
+                );
             }
 
             $copied++;
