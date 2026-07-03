@@ -1,0 +1,40 @@
+parameters:
+    # Analysis strictness (0 = loosest, 9 = strictest).
+    # Level 6 catches real type errors (missing/incorrect return and
+    # argument types) without drowning in false positives from WordPress'
+    # loosely-typed core functions.
+    level: 6
+
+    # Only analyze our own code. vendor/ (Flagship SDK, dependencies) is
+    # third-party and not maintained here, so it is not scanned.
+    paths:
+        - includes
+        - ab-test-flagship.php
+
+    # Target the plugin's minimum supported PHP version, not the 8.3 the
+    # CLI happens to run. This makes PHPStan validate against what users
+    # on PHP 8.1 will actually experience.
+    phpVersion: 80100
+
+    # Teach PHPStan about WordPress core functions, classes and constants
+    # (add_action, wp_die, $wpdb, esc_html, etc.) so it does not report
+    # them as "unknown". Without this, every WP call would be a false error.
+    scanFiles:
+        - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+
+    # WordPress core constants that the stubs package does not define
+    # (HOUR_IN_SECONDS, ARRAY_A). Loaded only for analysis, never at runtime.
+    bootstrapFiles:
+        - phpstan-constants.php
+
+    # Treat PHPDoc @var/@param/@return as authoritative where present.
+    treatPhpDocTypesAsCertain: false
+
+    # Silence only the "no value type specified in iterable type array" rule.
+    # These are documentation-only warnings (e.g. array vs array<string,int>),
+    # not runtime bugs. The plugin is in maintenance mode, so the payoff of
+    # annotating every array is low. All other level-6 checks stay active.
+    # To tighten types later, remove this block and add the annotations.
+    ignoreErrors:
+        -
+            identifier: missingType.iterableValue

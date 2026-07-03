@@ -21,6 +21,35 @@
 (function () {
 
     /**
+     * Whether frontend debug logging is enabled. Mirrors the PHP-side
+     * ABTF_LOG_LEVEL switch, exposed via abtfConfig.debug by wp_localize_script.
+     */
+    function abtfDebugEnabled() {
+        return !!(window.abtfConfig && window.abtfConfig.debug);
+    }
+
+    /**
+     * Debug-only console.log. Silent in production unless ABTF_LOG_LEVEL
+     * includes debug. Use for informational/diagnostic messages.
+     */
+    function abtfLog() {
+        if (abtfDebugEnabled()) {
+            console.log.apply(console, arguments);
+        }
+    }
+
+    /**
+     * Debug-only console.warn. Silent in production unless debug is enabled.
+     * Use for non-fatal warnings that do not break the conversion flow.
+     * Real failures use console.error directly and are always emitted.
+     */
+    function abtfWarn() {
+        if (abtfDebugEnabled()) {
+            console.warn.apply(console, arguments);
+        }
+    }
+
+    /**
      * Sends a hit event to the WordPress REST API endpoint.
      * Retries up to 3 times if the request fails with a server error (5xx).
      *
@@ -60,7 +89,7 @@
                 // these carry a `code` field and arrive with a 4xx status.
                 // Not retried — the client cannot fix them by retrying.
                 if (data.code) {
-                    console.warn('[AB Test] Hit rejected by server:', data.message);
+                    abtfWarn('[AB Test] Hit rejected by server:', data.message);
                     return;
                 }
 
@@ -68,7 +97,7 @@
                 // NOT be recorded internally (e.g. Redis down) — a real problem
                 // worth surfacing, distinct from a server rejection.
                 if (data.success === false) {
-                    console.warn('[AB Test] Conversion not recorded internally:', data.message);
+                    abtfWarn('[AB Test] Conversion not recorded internally:', data.message);
                     return;
                 }
 
@@ -77,23 +106,23 @@
                 // the conversion itself.
                 switch (data.flagship) {
                     case 'sent':
-                        console.log('[AB Test] Conversion recorded. Flagship: sent.', data);
+                        abtfLog('[AB Test] Conversion recorded. Flagship: sent.', data);
                         break;
                     case 'failed':
-                        console.warn('[AB Test] Conversion recorded, but Flagship delivery failed (counted internally).', data);
+                        abtfWarn('[AB Test] Conversion recorded, but Flagship delivery failed (counted internally).', data);
                         break;
                     case 'skipped':
-                        console.log('[AB Test] Conversion recorded. Flagship: skipped (no credentials).', data);
+                        abtfLog('[AB Test] Conversion recorded. Flagship: skipped (no credentials).', data);
                         break;
                     default:
-                        console.log('[AB Test] Conversion recorded.', data);
+                        abtfLog('[AB Test] Conversion recorded.', data);
                 }
             })
             .catch(function (error) {
                 console.error('[AB Test] Failed to send hit (attempt ' + attempt + '):', error);
 
                 if (attempt < MAX_ATTEMPTS) {
-                    console.log('[AB Test] Retrying in ' + RETRY_DELAY_MS + 'ms...');
+                    abtfLog('[AB Test] Retrying in ' + RETRY_DELAY_MS + 'ms...');
                     setTimeout(function () {
                         sendHit(experimentId, eventName, variant, attempt + 1);
                     }, RETRY_DELAY_MS);
@@ -108,7 +137,7 @@
      */
     function registerListeners() {
         if (!window.abTestConfig || !window.abTestData || !window.abtfConfig) {
-            console.warn('[AB Test] abTestConfig, abTestData or abtfConfig not found.');
+            abtfWarn('[AB Test] abTestConfig, abTestData or abtfConfig not found.');
             return;
         }
 
@@ -116,25 +145,25 @@
             const element = document.querySelector(config.selector);
 
             if (!element) {
-                console.warn('[AB Test] Element not found for selector:', config.selector);
+                abtfWarn('[AB Test] Element not found for selector:', config.selector);
                 return;
             }
 
             const variant = window.abTestData.experiments[config.experimentId];
 
             if (variant === undefined || variant === null) {
-                console.warn('[AB Test] Variant not found for experiment:', config.experimentId);
+                abtfWarn('[AB Test] Variant not found for experiment:', config.experimentId);
                 return;
             }
 
             const eventType = config.type || 'click';
 
             element.addEventListener(eventType, function () {
-                console.log('[AB Test] Event detected:', eventType, 'on:', config.selector);
+                abtfLog('[AB Test] Event detected:', eventType, 'on:', config.selector);
                 sendHit(config.experimentId, config.eventName, variant);
             });
 
-            console.log('[AB Test] Listener registered for:', config.selector, '| experiment:', config.experimentId, '| variant:', variant);
+            abtfLog('[AB Test] Listener registered for:', config.selector, '| experiment:', config.experimentId, '| variant:', variant);
         });
     }
 

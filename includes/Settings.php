@@ -29,7 +29,7 @@ class Settings
     {
         add_submenu_page(
             'abtf-experiments',
-            'AB Test — Settings',
+            'AB Tests — Settings',
             'Settings',
             'manage_options',
             self::MENU_SLUG,
@@ -52,7 +52,7 @@ class Settings
         }
 
         if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have permission to perform this action.'), 403);
+            wp_die(esc_html__('You do not have permission to perform this action.', 'server-side-a-b-testing'), 403);
         }
 
         $action = sanitize_key($_POST['abtf_settings_action'] ?? '');
@@ -168,7 +168,7 @@ class Settings
         $currentJsPath    = VisitorIdProvider::getJsPath() ?? '';
 ?>
         <div class="wrap">
-            <h1>AB Test — Settings</h1>
+            <h1>AB Tests — Settings</h1>
 
             <!-- Section 1: Flagship Credentials -->
             <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 600px; margin-top: 16px;">

@@ -96,6 +96,9 @@ class HitCacheRedis implements IHitCacheImplementation {
                 if ($hit !== false) {
                     $decoded = json_decode($hit, true);
                     if ($decoded !== null) {
+                        // $keys and the mGet() result are aligned by position,
+                        // so $keys[$index] is always a valid offset here.
+                        // @phpstan-ignore offsetAccess.notFound
                         $hitsOut[$keys[$index]] = $decoded;
                     }
                 }

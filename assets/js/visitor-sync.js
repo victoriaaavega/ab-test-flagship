@@ -16,12 +16,40 @@
  * Configuration is injected by PHP via wp_localize_script as abtfConfig:
  *   abtfConfig.visitorIdProvider  — 'heap' | 'custom'
  *   abtfConfig.visitorIdJsPath    — e.g. 'window.heap.userId' or 'window.myApp.user.id'
- *   abtfConfig.cookieDomain       — e.g. '.castingnetworks.com'
+ *   abtfConfig.cookieDomain       — e.g. '.example.com'
  *   abtfConfig.identifyUrl        — REST endpoint URL
  *   abtfConfig.nonce              — WordPress nonce
  */
 
 (function () {
+
+    /**
+     * Whether frontend debug logging is enabled. Mirrors the PHP-side
+     * ABTF_LOG_LEVEL switch, exposed via abtfConfig.debug by wp_localize_script.
+     */
+    function abtfDebugEnabled() {
+        return !!(window.abtfConfig && window.abtfConfig.debug);
+    }
+
+    /**
+     * Debug-only console.log. Silent in production unless ABTF_LOG_LEVEL
+     * includes debug. Use for informational/diagnostic messages.
+     */
+    function abtfLog() {
+        if (abtfDebugEnabled()) {
+            console.log.apply(console, arguments);
+        }
+    }
+
+    /**
+     * Debug-only console.warn. Silent in production unless debug is enabled.
+     * Use for non-fatal warnings that do not break the sync flow.
+     */
+    function abtfWarn() {
+        if (abtfDebugEnabled()) {
+            console.warn.apply(console, arguments);
+        }
+    }
 
     var COOKIE_NAME = 'abtf_visitor_id';
     var COOKIE_TTL  = 60 * 60 * 24 * 30; // 30 days in seconds
@@ -34,7 +62,7 @@
      * Writes the visitor ID to a first-party cookie readable by PHP.
      *
      * @param {string} visitorId
-     * @param {string} cookieDomain  e.g. '.castingnetworks.com' or '.test.test'
+     * @param {string} cookieDomain  e.g. '.example.com' or '.example.test'
      */
     function writeCookie(visitorId, cookieDomain) {
         var value      = encodeURIComponent(visitorId);
@@ -48,7 +76,7 @@
             + '; SameSite=Lax'
             + secure;
 
-        console.log('[AB Test Sync] Cookie written:', visitorId, '| domain:', cookieDomain || '(current)');
+        abtfLog('[AB Test Sync] Cookie written:', visitorId, '| domain:', cookieDomain || '(current)');
     }
 
     /**
@@ -127,10 +155,10 @@
         })
             .then(function (response) { return response.json(); })
             .then(function (data) {
-                console.log('[AB Test Sync] Reconciliation complete. Assignments copied:', data.copied);
+                abtfLog('[AB Test Sync] Reconciliation complete. Assignments copied:', data.copied);
             })
             .catch(function (error) {
-                console.warn('[AB Test Sync] Reconciliation failed (non-blocking):', error);
+                abtfWarn('[AB Test Sync] Reconciliation failed (non-blocking):', error);
             });
     }
 
@@ -140,7 +168,7 @@
 
     function sync() {
         if (!window.abtfConfig) {
-            console.warn('[AB Test Sync] abtfConfig not found.');
+            abtfWarn('[AB Test Sync] abtfConfig not found.');
             return;
         }
 
@@ -154,7 +182,7 @@
         var externalId = resolveJsPath(jsPath);
 
         if (!externalId) {
-            console.warn('[AB Test Sync] Could not resolve visitor ID from path:', jsPath);
+            abtfWarn('[AB Test Sync] Could not resolve visitor ID from path:', jsPath);
             return;
         }
 
@@ -162,7 +190,7 @@
         var cookieDomain = window.abtfConfig.cookieDomain || '';
 
         if (existing === externalId) {
-            console.log('[AB Test Sync] Cookie already up to date:', externalId);
+            abtfLog('[AB Test Sync] Cookie already up to date:', externalId);
             return;
         }
 
@@ -171,7 +199,7 @@
         writeCookie(externalId, cookieDomain);
 
         if (isFirstWrite && window.abTestData && window.abTestData.visitorId) {
-            console.log('[AB Test Sync] First write — reconciling fingerprint:', window.abTestData.visitorId);
+            abtfLog('[AB Test Sync] First write — reconciling fingerprint:', window.abTestData.visitorId);
             reconcile(window.abTestData.visitorId, externalId);
         }
     }
@@ -198,7 +226,7 @@
 
             if (attempts >= maxAttempts) {
                 clearInterval(interval);
-                console.warn('[AB Test Sync] abTestData not available after 3s. Syncing without reconciliation.');
+                abtfWarn('[AB Test Sync] abTestData not available after 3s. Syncing without reconciliation.');
                 sync();
             }
         }, 50);

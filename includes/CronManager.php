@@ -11,8 +11,8 @@ if (!defined('ABSPATH')) {
  * is always scheduled while the plugin is active.
  *
  * Production note: WP-Cron only fires when someone visits the site.
- * On Kinsta, configure a real system cron to hit the site every 8 hours:
- *   curl --silent https://castingnetworks.com/wp-cron.php?doing_wp_cron > /dev/null 2>&1
+ * On managed hosting, configure a real system cron to hit the site every 8 hours:
+ *   curl --silent https://example.com/wp-cron.php?doing_wp_cron > /dev/null 2>&1
  */
 class CronManager
 {
@@ -24,18 +24,6 @@ class CronManager
     {
         add_action(self::HOOK, [$this, 'runRebuild']);
         $this->maybeSchedule();
-    }
-
-    /**
-     * Registers the custom 8-hour interval with WP-Cron.
-     */
-    public function registerInterval(array $schedules): array
-    {
-        $schedules[self::INTERVAL] = [
-            'interval' => 8 * HOUR_IN_SECONDS,
-            'display'  => 'Every 8 hours',
-        ];
-        return $schedules;
     }
 
     /**

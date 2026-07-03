@@ -36,7 +36,7 @@ class ReportingPage
     {
         add_submenu_page(
             'abtf-experiments',
-            'AB Test — Reporting',
+            'AB Tests — Reporting',
             'Reporting',
             'manage_options',
             self::MENU_SLUG,
@@ -73,7 +73,7 @@ class ReportingPage
     private function handleRebuildStats(): void
     {
         if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have permission to perform this action.'), 403);
+            wp_die(esc_html__('You do not have permission to perform this action.', 'server-side-a-b-testing'), 403);
         }
 
         check_admin_referer('abtf_rebuild_stats');
@@ -140,7 +140,7 @@ class ReportingPage
 
         ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">AB Test — Reporting</h1>
+            <h1 class="wp-heading-inline">AB Tests — Reporting</h1>
             <form method="post" style="display:inline;">
                 <?php wp_nonce_field('abtf_rebuild_stats'); ?>
                 <input type="hidden" name="abtf_action" value="rebuild_stats">

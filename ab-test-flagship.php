@@ -1,11 +1,15 @@
 <?php
 
 /**
- * Plugin Name: AB Test Flagship
- * Description: Server-side A/B testing using AB Tasty Flagship SDK
+ * Plugin Name: Server-Side A/B Testing
+ * Description: No-flicker server-side A/B testing. Integrates with AB Tasty Flagship.
  * Version: 1.8.0
  * Author: Victoria Vega
+ * Requires at least: 6.5
  * Requires PHP: 8.1
+ * License: GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: server-side-a-b-testing
  */
 
 if (!defined('ABSPATH')) {
@@ -67,9 +71,11 @@ add_action('plugins_loaded', function (): void {
 
     if (is_admin()) {
         new MetaBox();
+        // Submenu order follows instantiation order: Experiments (parent),
+        // then Reporting, then Settings. Keep Settings last by convention.
         new ExperimentsPage();
-        new Settings();
         new ReportingPage();
+        new Settings();
     }
 });
 
@@ -79,7 +85,7 @@ add_action('plugins_loaded', function (): void {
 
 /**
  * Derives the shared cookie domain from the site's home URL.
- * Returns '.castingnetworks.com' in production, '.test.test' locally, etc.
+ * Returns '.example.com' for a host like 'www.example.com', etc.
  * Returns an empty string for single-word hosts like 'localhost'.
  */
 function abtf_get_cookie_domain(): string
@@ -128,6 +134,9 @@ function abtf_enqueue_scripts(): void
         // Passed to visitor-sync.js — null when provider is fingerprint.
         'visitorIdProvider' => VisitorIdProvider::getProvider(),
         'visitorIdJsPath'   => VisitorIdProvider::getJsPath(),
+        // Gates frontend console output behind the same ABTF_LOG_LEVEL switch
+        // that controls PHP logging. True only when the level includes debug.
+        'debug'             => Logger::isDebug(),
     ]);
 }
 add_action('wp_enqueue_scripts', 'abtf_enqueue_scripts');
@@ -146,7 +155,7 @@ function abtf_check_credentials(): void
         add_action('admin_notices', function (): void {
             $settingsUrl = admin_url('admin.php?page=abtf-settings');
             echo '<div class="notice notice-error"><p>';
-            echo '<strong>AB Test Flagship:</strong> ';
+            echo '<strong>AB Tests:</strong> ';
             echo 'Flagship credentials are not configured. ';
             echo '<a href="' . esc_url($settingsUrl) . '">Configure them in AB Tests → Settings</a>.';
             echo '</p></div>';

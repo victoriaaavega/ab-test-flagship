@@ -50,7 +50,7 @@ class ExperimentsPage
     {
         if (!current_user_can('manage_options')) {
             wp_die(
-                esc_html__('You do not have permission to perform this action.'),
+                esc_html__('You do not have permission to perform this action.', 'server-side-a-b-testing'),
                 403
             );
         }
@@ -59,7 +59,7 @@ class ExperimentsPage
     public function addMenuPage(): void
     {
         add_menu_page(
-            'AB Test Experiments',
+            'AB Tests — Experiments',
             'AB Tests',
             'manage_options',
             $this->menuSlug,
@@ -79,7 +79,7 @@ class ExperimentsPage
     // -------------------------------------------------------------------------
 
     private const NOTICE_MESSAGES = [
-        'created'       => 'Experiment created successfully.',
+        'created'       => 'Experiment created (paused). Click Resume to activate it.',
         'updated'       => 'Experiment updated successfully.',
         'paused'        => 'Experiment paused.',
         'resumed'       => 'Experiment resumed.',
@@ -214,7 +214,11 @@ class ExperimentsPage
             'event_name' => $eventName,
             'event_type' => $eventType,
             'urls'       => $urls,
-            'status'     => 'active',
+            // New experiments start paused so the configuration (selector, URLs,
+            // flag key) can be reviewed before the experiment goes live. Only
+            // active experiments are injected and assigned, so a paused start
+            // prevents variant assignments from being cached before verification.
+            'status'     => 'paused',
         ]);
 
         if ($result === false) {
@@ -358,7 +362,7 @@ class ExperimentsPage
 
 ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">AB Test — Experiments</h1>
+            <h1 class="wp-heading-inline">AB Tests — Experiments</h1>
             <a href="<?php echo esc_url($addNewUrl); ?>" class="page-title-action">Add New</a>
             <hr class="wp-header-end">
 

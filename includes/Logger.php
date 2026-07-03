@@ -62,6 +62,22 @@ class Logger
     }
 
     /**
+     * Whether the configured level includes debug verbosity.
+     *
+     * Exposed so the frontend (via wp_localize_script) can gate its own
+     * console output behind the same ABTF_LOG_LEVEL switch that controls
+     * PHP logging, keeping both halves of the plugin on one control.
+     */
+    public static function isDebug(): bool
+    {
+        if (self::$threshold === null) {
+            self::$threshold = self::resolveThreshold();
+        }
+
+        return self::$threshold >= self::LEVELS['debug'];
+    }
+
+    /**
      * Emits the message only if its level is at or below the configured
      * threshold. Resolves and caches the threshold once per request.
      */

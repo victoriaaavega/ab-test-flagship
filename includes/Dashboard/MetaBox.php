@@ -20,7 +20,7 @@ class MetaBox {
     public function register(): void {
         wp_add_dashboard_widget(
             'abtf_experiments_widget',
-            'AB Test — Experiments',
+            'AB Tests — Experiments',
             [$this, 'render']
         );
     }

@@ -1,7 +1,7 @@
 {
     "name": "victoriavega/ab-test-flagship",
     "description": "WordPress plugin for server-side A/B testing using the AB Tasty Flagship SDK. Eliminates flicker by deciding variants in PHP before rendering HTML.",
-    "license": "MIT",
+    "license": "GPL-2.0-or-later",
     "authors": [
         {
             "name": "Victoria Vega"
@@ -17,5 +17,9 @@
         "classmap": [
             "includes/"
         ]
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.2",
+        "php-stubs/wordpress-stubs": "^7.0"
     }
 }
