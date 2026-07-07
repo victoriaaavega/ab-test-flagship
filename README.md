@@ -1,4 +1,4 @@
-# AB Test Flagship
+# Server-Side A/B Testing
 
 WordPress plugin for server-side A/B testing using the AB Tasty Flagship SDK. Eliminates flicker by deciding variants in PHP before rendering HTML, with Redis caching, database fallback, and event tracking.
 
@@ -10,7 +10,7 @@ WordPress plugin for server-side A/B testing using the AB Tasty Flagship SDK. El
 User visits page
       ↓
 PHP generates visitor ID
-  → External provider cookie present? (heap, custom) → use it
+  → External provider cookie present? (heap, custom) → use the RAW ID as-is
   → No cookie yet?                                   → SHA256 fingerprint (IP + UA + Language)
       ↓
 Redis has variant? → Yes → serve it (< 1ms)
@@ -32,12 +32,14 @@ PHP records the conversion internally (Redis DB 3) → forwards hit to Flagship
 
 The activate hit exposes the visitor to their assigned variation and must precede conversion events so Flagship can attribute them in reporting. It is sent with a direct HTTP call (not the SDK pool), so a returning visitor served straight from Redis is still activated.
 
+**Visitor ID hashing:** only the fingerprint is hashed (SHA256), because it processes the visitor's IP address and must never be stored or sent in clear. The heap and custom providers return the **raw** ID, so the value that reaches Flagship matches exactly the one the team's own integration sends to AB Tasty. This avoids counting the same person as two visitors. As a result, the visitor ID is no longer always a 64-char hex string: with heap it is Heap's own format (e.g. a numeric userId).
+
 ---
 
 ## Requirements
 
 - PHP 8.1+
-- WordPress 6.0+
+- WordPress 6.5+
 - Redis (phpredis extension)
 - Composer
 - AB Tasty Flagship account
@@ -49,13 +51,13 @@ The activate hit exposes the visitor to their assigned variation and must preced
 **1. Clone or download the plugin into your WordPress plugins directory:**
 
 ```
-wp-content/plugins/ab-test-flagship/
+wp-content/plugins/server-side-a-b-testing/
 ```
 
 **2. Install PHP dependencies:**
 
 ```bash
-cd wp-content/plugins/ab-test-flagship
+cd wp-content/plugins/server-side-a-b-testing
 composer install
 ```
 
@@ -81,11 +83,13 @@ This means you can develop and test experiments locally without a Flagship accou
 
 The plugin supports three strategies for identifying returning visitors, configurable under **AB Tests → Settings → Visitor ID Provider**:
 
-| Provider | How it works | JS dependency |
-|---|---|---|
-| **Fingerprint** (default) | SHA256 of IP + User-Agent + Accept-Language | None |
-| **Heap** | Reads `window.heap.userId`, writes `abtf_visitor_id` cookie | Heap Analytics snippet |
-| **Custom** | Reads any JS path (e.g. `window.myApp.user.id`), writes `abtf_visitor_id` cookie | Your analytics tool |
+| Provider | How it works | Hashed? | JS dependency |
+|---|---|---|---|
+| **Fingerprint** (default) | SHA256 of IP + User-Agent + Accept-Language | Yes (protects the IP) | None |
+| **Heap** | Reads `window.heap.userId`, writes `abtf_visitor_id` cookie | No (raw ID) | Heap Analytics snippet |
+| **Custom** | Reads any JS path (e.g. `window.myApp.user.id`), writes `abtf_visitor_id` cookie | No (raw ID) | Your analytics tool |
+
+**Why heap/custom are not hashed:** the ID that reaches Flagship must match exactly the ID the team's own integration sends to AB Tasty (the raw Heap userId). Hashing it would produce a mismatch and count the same human as two visitors. Fingerprint is hashed because it derives from the visitor's IP, which is personal data.
 
 **First visit flow (external provider):**
 1. No cookie yet → PHP uses fingerprint to assign variant
@@ -93,7 +97,7 @@ The plugin supports three strategies for identifying returning visitors, configu
 3. JS calls `POST /identify` → copies fingerprint assignments to the external visitor ID (fire-and-forget)
 
 **Subsequent visits:**
-1. Cookie present → PHP uses external ID directly → variant found in Redis in < 1ms
+1. Cookie present → PHP uses the external ID directly (raw) → variant found in Redis in < 1ms
 2. JS sees cookie already up to date → does nothing
 
 ---
@@ -175,13 +179,15 @@ X-ABTF-Nonce: {nonce injected automatically by the plugin}
 **Body:**
 ```json
 {
-    "visitor_id":    "64-char SHA256 hex string",
+    "visitor_id":    "fingerprint: 64-char SHA256 hex — heap/custom: raw provider ID",
     "experiment_id": "your_flag_key",
     "event_name":    "your_event_name",
     "variant":       "control",
     "page_url":      "https://example.com/page"
 }
 ```
+
+> **Note:** the `visitor_id` format depends on the active provider. With fingerprint it is a 64-char SHA256 hex string; with heap or custom it is the raw provider ID (see "Visitor ID providers").
 
 **Response (HTTP 200):**
 ```json
@@ -230,16 +236,21 @@ define('ABTF_LOG_LEVEL', 'debug');   // development
 define('ABTF_LOG_LEVEL', 'error');   // production (or omit — error is the default)
 ```
 
-All messages are prefixed `[AB Test]`.
+**PHP logging** writes through the `Logger` class to the PHP error log, prefixed `[AB Test]`.
+
+**JS logging** (`event-tracker.js` and `visitor-sync.js`) is gated by the same switch: the plugin exposes `abtfConfig.debug` (true only when `ABTF_LOG_LEVEL` is `debug`) and the browser console output respects it. In production the console stays clean; only real failures use `console.error` and are always emitted. Debug messages are prefixed `[AB Test]` (event tracker) and `[AB Test Sync]` (visitor sync).
 
 ---
 
 ## File structure
 
 ```
-ab-test-flagship/
-├── ab-test-flagship.php                   ← plugin entry point
+server-side-a-b-testing/
+├── server-side-a-b-testing.php            ← plugin entry point
 ├── composer.json                          ← PHP dependencies
+├── phpstan.neon                           ← static analysis config (level 6)
+├── phpstan-constants.php                  ← WordPress constants for PHPStan
+├── readme.txt                             ← WordPress.org readme
 ├── vendor/                                ← Flagship SDK (not in Git)
 ├── assets/
 │   └── js/
@@ -248,7 +259,7 @@ ab-test-flagship/
 └── includes/
     ├── Logger.php                         ← leveled logging gated by ABTF_LOG_LEVEL
     ├── VisitorIdProvider.php              ← manages provider config (fingerprint / heap / custom)
-    ├── Fingerprint.php                    ← generates visitor ID from cookie or SHA256 fingerprint
+    ├── Fingerprint.php                    ← generates visitor ID from cookie (raw) or SHA256 fingerprint
     ├── RedisClient.php                    ← singleton Redis connection for variant assignments (DB 0)
     ├── Database.php                       ← DB fallback and table definitions
     ├── HitCacheRedis.php                  ← caches failed Flagship hits for retry (DB 1)
@@ -278,7 +289,7 @@ ab-test-flagship/
 
 ## Admin pages
 
-**AB Tests → Experiments** — create, edit, pause, and delete experiments. Each experiment defines a flag key, CSS selector, event name, event type, and URL rules with wildcard support (e.g. `/talent/*`).
+**AB Tests → Experiments** — create, edit, pause, and delete experiments. Each experiment defines a flag key, CSS selector, event name, event type, and URL rules with wildcard support (e.g. `/talent/*`). **New experiments start paused** so you can verify the configuration before they serve any variant; review it, then click Resume to activate.
 
 **AB Tests → Reporting** — live conversions dashboard showing unique visitors, unique conversions, total conversions, conversion rate, and growth vs. the `control` baseline, per experiment and event. Reads live from Redis, falling back to the SQL snapshot when Redis is unavailable. Includes a Rebuild Stats button to force a stats refresh without waiting for the cron.
 
