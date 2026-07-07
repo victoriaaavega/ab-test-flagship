@@ -2,7 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.8.0] - 2026-06-08
+## [1.8.0] - 2026-07-07
+
+### Release preparation (WordPress.org)
+- Renamed the plugin to "Server-Side A/B Testing" (from "AB Test Flagship").
+  The old name risked trademark confusion with AB Tasty Flagship; the new name
+  describes what the plugin does. Main file and folder renamed to
+  server-side-a-b-testing; Flagship is credited in the description instead.
+- Added the WordPress.org plugin header fields: GPLv2 license, License URI,
+  Requires at least (6.5), and Text Domain (server-side-a-b-testing).
+- Experiments now start paused by default. Only active experiments are injected
+  and assigned, so a paused start prevents variant assignments from being cached
+  before the configuration is verified. Review, then Resume to activate.
+- Gated all JavaScript console logging behind the same ABTF_LOG_LEVEL switch
+  that controls PHP logging. In production the console stays clean; only real
+  failures (console.error) are always emitted.
+- Unified the admin branding to "AB Tests" and reordered the menu to
+  Experiments, Reporting, Settings.
+- Added the plugin text domain to translatable strings.
+- Corrected the composer.json license to GPL-2.0-or-later.
+- Added static analysis: PHPStan (level 6) with a WordPress-stubs setup,
+  passing clean.
+- Removed dead code (CronManager::registerInterval) and neutralized internal
+  references in comments.
 
 ### Added
 - FlagshipActivator class — sends activate hits directly to
