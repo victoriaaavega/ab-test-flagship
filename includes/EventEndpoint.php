@@ -289,7 +289,7 @@ class EventEndpoint
 
         foreach ($headers as $header) {
             if (!empty($_SERVER[$header])) {
-                $ip = trim(explode(',', $_SERVER[$header])[0]);
+                $ip = trim(explode(',', sanitize_text_field(wp_unslash($_SERVER[$header])))[0]);
                 if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
                     return $ip;
                 }
@@ -298,7 +298,7 @@ class EventEndpoint
 
         foreach ($headers as $header) {
             if (!empty($_SERVER[$header])) {
-                $ip = trim(explode(',', $_SERVER[$header])[0]);
+                $ip = trim(explode(',', sanitize_text_field(wp_unslash($_SERVER[$header])))[0]);
                 if (filter_var($ip, FILTER_VALIDATE_IP)) {
                     return $ip;
                 }

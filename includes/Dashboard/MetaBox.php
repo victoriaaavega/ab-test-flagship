@@ -30,6 +30,8 @@ class MetaBox {
 
         $statsTable = $wpdb->prefix . 'ab_test_stats';
 
+        // Table name from $wpdb->prefix (not user input); cannot be prepared.
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $results = $wpdb->get_results(
             "SELECT experiment_id, variant, total, last_rebuilt_at
              FROM {$statsTable}

@@ -110,8 +110,8 @@ class ExperimentsPage
             return;
         }
 
-        $key  = sanitize_key($_GET['abtf_notice'] ?? '');
-        $type = sanitize_key($_GET['abtf_type']   ?? 'success');
+        $key  = sanitize_key(wp_unslash($_GET['abtf_notice'] ?? ''));
+        $type = sanitize_key(wp_unslash($_GET['abtf_type']   ?? 'success'));
 
         if ($key === '' || !isset(self::NOTICE_MESSAGES[$key])) {
             return;
@@ -139,13 +139,13 @@ class ExperimentsPage
     public function handleWrites(): void
     {
         // Only act on our own page
-        if (($_GET['page'] ?? '') !== $this->menuSlug) {
+        if ((isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '') !== $this->menuSlug) {
             return;
         }
 
         // POST writes
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $postAction = sanitize_key($_POST['abtf_action'] ?? '');
+            $postAction = sanitize_key(wp_unslash($_POST['abtf_action'] ?? ''));
 
             match ($postAction) {
                 'create'         => $this->handleCreate(),
@@ -156,7 +156,7 @@ class ExperimentsPage
         }
 
         // GET writes
-        $action = sanitize_key($_GET['action'] ?? '');
+        $action = sanitize_key(wp_unslash($_GET['action'] ?? ''));
 
         match ($action) {
             'toggle' => $this->handleToggle(),
@@ -183,12 +183,12 @@ class ExperimentsPage
         $this->requirePermission();
         check_admin_referer('abtf_create_experiment');
 
-        $flagKey   = sanitize_text_field($_POST['flag_key']   ?? '');
-        $name      = sanitize_text_field($_POST['name']       ?? '');
-        $selector  = sanitize_text_field($_POST['selector']   ?? '');
-        $eventName = sanitize_text_field($_POST['event_name'] ?? '');
-        $eventType = sanitize_text_field($_POST['event_type'] ?? 'click');
-        $urls      = sanitize_textarea_field($_POST['urls']   ?? '');
+        $flagKey   = sanitize_text_field(wp_unslash($_POST['flag_key']   ?? ''));
+        $name      = sanitize_text_field(wp_unslash($_POST['name']       ?? ''));
+        $selector  = sanitize_text_field(wp_unslash($_POST['selector']   ?? ''));
+        $eventName = sanitize_text_field(wp_unslash($_POST['event_name'] ?? ''));
+        $eventType = sanitize_text_field(wp_unslash($_POST['event_type'] ?? 'click'));
+        $urls      = sanitize_textarea_field(wp_unslash($_POST['urls']   ?? ''));
 
         if (!$this->validateFields([$flagKey, $name, $selector, $eventName, $eventType, $urls])) {
             wp_safe_redirect($this->redirectUrl([], 'invalid_field', 'error'));
@@ -244,11 +244,11 @@ class ExperimentsPage
             exit;
         }
 
-        $name      = sanitize_text_field($_POST['name']       ?? '');
-        $selector  = sanitize_text_field($_POST['selector']   ?? '');
-        $eventName = sanitize_text_field($_POST['event_name'] ?? '');
-        $eventType = sanitize_text_field($_POST['event_type'] ?? 'click');
-        $urls      = sanitize_textarea_field($_POST['urls']   ?? '');
+        $name      = sanitize_text_field(wp_unslash($_POST['name']       ?? ''));
+        $selector  = sanitize_text_field(wp_unslash($_POST['selector']   ?? ''));
+        $eventName = sanitize_text_field(wp_unslash($_POST['event_name'] ?? ''));
+        $eventType = sanitize_text_field(wp_unslash($_POST['event_type'] ?? 'click'));
+        $urls      = sanitize_textarea_field(wp_unslash($_POST['urls']   ?? ''));
 
         if (!$this->validateFields([$name, $selector, $eventName, $eventType, $urls])) {
             wp_safe_redirect($this->redirectUrl(['action' => 'edit', 'id' => $id], 'invalid_field', 'error'));
@@ -339,7 +339,7 @@ class ExperimentsPage
      */
     public function renderPage(): void
     {
-        $action = sanitize_key($_GET['action'] ?? '');
+        $action = sanitize_key(wp_unslash($_GET['action'] ?? ''));
 
         match ($action) {
             'edit'  => $this->renderEdit(intval($_GET['id'] ?? 0)),
@@ -421,7 +421,7 @@ class ExperimentsPage
                                     </small>
                                 </td>
                                 <td style="word-break: break-all;"><?php echo esc_html($exp->urls); ?></td>
-                                <td><?php echo $this->statusBadge($exp->status); ?></td>
+                                <td><?php echo wp_kses_post($this->statusBadge($exp->status)); ?></td>
                                 <td>
                                     <a href="<?php echo esc_url($editUrl); ?>"
                                         class="button button-small">Edit</a>

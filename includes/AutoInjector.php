@@ -34,18 +34,21 @@ class AutoInjector {
         $tableName = $wpdb->prefix . 'ab_test_experiments';
 
         // 1. Fetch only active experiments
+        // Table name comes from $wpdb->prefix (not user input) and cannot be
+        // passed through prepare(). 'active' is a hardcoded literal, no user data.
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $experiments = $wpdb->get_results("SELECT * FROM {$tableName} WHERE status = 'active'");
 
         if (empty($experiments)) {
             return;
         }
 
-        $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
+        $currentUri = isset($_SERVER['REQUEST_URI']) ? sanitize_text_field(wp_unslash($_SERVER['REQUEST_URI'])) : '/';
         // parse_url() returns string on success, null when there is no path,
         // or false on a malformed URL. matchUrl() requires a string, so fall
         // back to '/' to avoid a TypeError on unusual request URIs (bots,
         // fuzzing, rewriting proxies).
-        $parsedUri  = parse_url($currentUri, PHP_URL_PATH) ?: '/';
+        $parsedUri  = wp_parse_url($currentUri, PHP_URL_PATH) ?: '/';
 
         $matchedExperiments = [];
 

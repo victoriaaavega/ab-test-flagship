@@ -70,7 +70,7 @@ class Fingerprint
             return null;
         }
 
-        $value = sanitize_text_field($_COOKIE[$cookieName]);
+        $value = sanitize_text_field(wp_unslash($_COOKIE[$cookieName]));
 
         if ($value === '') {
             return null;
@@ -89,8 +89,8 @@ class Fingerprint
     {
         $data = [
             'ip'              => $this->getClientIp(),
-            'user_agent'      => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-            'accept_language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'unknown',
+            'user_agent'      => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : 'unknown',
+            'accept_language' => isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_ACCEPT_LANGUAGE'])) : 'unknown',
         ];
 
         return hash('sha256', implode('|', $data));
@@ -112,7 +112,7 @@ class Fingerprint
 
         foreach ($headers as $header) {
             if (!empty($_SERVER[$header])) {
-                $ip = trim(explode(',', $_SERVER[$header])[0]);
+                $ip = trim(explode(',', sanitize_text_field(wp_unslash($_SERVER[$header])))[0]);
                 if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
                     return $ip;
                 }
@@ -121,7 +121,7 @@ class Fingerprint
 
         foreach ($headers as $header) {
             if (!empty($_SERVER[$header])) {
-                $ip = trim(explode(',', $_SERVER[$header])[0]);
+                $ip = trim(explode(',', sanitize_text_field(wp_unslash($_SERVER[$header])))[0]);
                 if (filter_var($ip, FILTER_VALIDATE_IP)) {
                     return $ip;
                 }

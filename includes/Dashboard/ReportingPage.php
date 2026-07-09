@@ -55,7 +55,7 @@ class ReportingPage
 
     public function handleWrites(): void
     {
-        if (($_GET['page'] ?? '') !== self::MENU_SLUG) {
+        if ((isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '') !== self::MENU_SLUG) {
             return;
         }
 
@@ -63,7 +63,7 @@ class ReportingPage
             return;
         }
 
-        $action = sanitize_key($_POST['abtf_action'] ?? '');
+        $action = sanitize_key(wp_unslash($_POST['abtf_action'] ?? ''));
 
         if ($action === 'rebuild_stats') {
             $this->handleRebuildStats();
@@ -107,8 +107,8 @@ class ReportingPage
             return;
         }
 
-        $key  = sanitize_key($_GET['abtf_notice'] ?? '');
-        $type = sanitize_key($_GET['abtf_type']   ?? 'success');
+        $key  = sanitize_key(wp_unslash($_GET['abtf_notice'] ?? ''));
+        $type = sanitize_key(wp_unslash($_GET['abtf_type']   ?? 'success'));
 
         if ($key === '' || !isset(self::NOTICE_MESSAGES[$key])) {
             return;
@@ -236,7 +236,7 @@ class ReportingPage
                                 <td style="text-align: right;"><?php echo esc_html(number_format($unique)); ?></td>
                                 <td style="text-align: right;"><?php echo esc_html(number_format($total)); ?></td>
                                 <td style="text-align: right;"><?php echo esc_html(number_format($rate, 2)); ?>%</td>
-                                <td style="text-align: right;"><?php echo $this->growthCell($rate, $baselineRate, $isBaseline); ?></td>
+                                <td style="text-align: right;"><?php echo wp_kses_post($this->growthCell($rate, $baselineRate, $isBaseline)); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -319,6 +319,10 @@ class ReportingPage
 
         $table = $wpdb->prefix . 'ab_test_conversions_stats';
 
+        // Table name comes from $wpdb->prefix (not user input) and cannot be
+        // passed through prepare(). No user data is interpolated. Reads the
+        // plugin's own pre-aggregated snapshot table.
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $results = $wpdb->get_results(
             "SELECT experiment_id, variant, event_name, unique_conversions, total_conversions, last_rebuilt_at
              FROM {$table}",
@@ -358,6 +362,10 @@ class ReportingPage
 
         $table = $wpdb->prefix . 'ab_test_stats';
 
+        // Table name comes from $wpdb->prefix (not user input) and cannot be
+        // passed through prepare(). No user data is interpolated. Reads the
+        // plugin's own pre-aggregated stats table.
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $results = $wpdb->get_results(
             "SELECT experiment_id, variant, total FROM {$table}",
             ARRAY_A

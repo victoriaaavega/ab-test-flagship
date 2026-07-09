@@ -90,7 +90,7 @@ add_action('plugins_loaded', function (): void {
  */
 function abtf_get_cookie_domain(): string
 {
-    $host  = parse_url(home_url(), PHP_URL_HOST) ?? '';
+    $host  = wp_parse_url(home_url(), PHP_URL_HOST) ?? '';
     $parts = explode('.', $host);
 
     if (count($parts) >= 2) {

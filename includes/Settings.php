@@ -43,7 +43,7 @@ class Settings
 
     public function handleWrites(): void
     {
-        if (($_GET['page'] ?? '') !== self::MENU_SLUG) {
+        if ((isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '') !== self::MENU_SLUG) {
             return;
         }
 
@@ -69,8 +69,8 @@ class Settings
     {
         check_admin_referer('abtf_save_settings');
 
-        $envId  = sanitize_text_field($_POST['flagship_env_id']  ?? '');
-        $apiKey = sanitize_text_field($_POST['flagship_api_key'] ?? '');
+        $envId  = sanitize_text_field(wp_unslash($_POST['flagship_env_id'] ?? ''));
+        $apiKey = sanitize_text_field(wp_unslash($_POST['flagship_api_key'] ?? ''));
 
         if ($envId === '' || $apiKey === '') {
             $this->redirect('invalid_fields', 'error');
@@ -95,7 +95,7 @@ class Settings
         check_admin_referer('abtf_save_provider');
 
         $provider = sanitize_key($_POST['visitor_id_provider'] ?? '');
-        $jsPath   = sanitize_text_field($_POST['visitor_id_js_path'] ?? '');
+        $jsPath   = sanitize_text_field(wp_unslash($_POST['visitor_id_js_path'] ?? ''));
 
         if (!in_array($provider, VisitorIdProvider::VALID_PROVIDERS, true)) {
             $this->redirect('provider_invalid', 'error');

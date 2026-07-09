@@ -74,6 +74,9 @@ class StatsRebuildJob {
         // safely delete anything older without risking a partial-batch delete.
         $rebuildAt = current_time('mysql', true); // UTC 'Y-m-d H:i:s'
 
+        // Table name comes from $wpdb->prefix (not user input) and cannot be
+        // passed through prepare(). No user data is interpolated.
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $rows = $wpdb->get_results(
             "SELECT experiment_id, variant, COUNT(*) as total
              FROM {$assignmentsTable}
@@ -103,6 +106,10 @@ class StatsRebuildJob {
             $values[]       = $rebuildAt;
         }
 
+        // The table name is interpolated (safe: from $wpdb->prefix); all values
+        // go through prepare() with the placeholders built above. The disable
+        // block covers the whole multi-line prepare() call.
+        // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
         $sql = $wpdb->prepare(
             "INSERT INTO {$statsTable} (experiment_id, variant, total, last_rebuilt_at)
              VALUES " . implode(', ', $placeholders) . "
@@ -111,7 +118,10 @@ class StatsRebuildJob {
                  last_rebuilt_at = VALUES(last_rebuilt_at)",
             $values
         );
+        // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 
+        // $sql was built with $wpdb->prepare() immediately above.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $result = $wpdb->query($sql);
 
         if ($result === false) {
@@ -121,6 +131,7 @@ class StatsRebuildJob {
         }
 
         // Sweep orphans: rows not refreshed by this rebuild no longer exist live.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $deleted = $wpdb->query(
             $wpdb->prepare(
                 "DELETE FROM {$statsTable} WHERE last_rebuilt_at < %s",
@@ -180,6 +191,10 @@ class StatsRebuildJob {
             $values[]       = $rebuildAt;
         }
 
+        // The table name is interpolated (safe: from $wpdb->prefix); all values
+        // go through prepare() with the placeholders built above. The disable
+        // block covers the whole multi-line prepare() call.
+        // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
         $sql = $wpdb->prepare(
             "INSERT INTO {$statsTable}
                 (experiment_id, variant, event_name, unique_conversions, total_conversions, last_rebuilt_at)
@@ -190,7 +205,10 @@ class StatsRebuildJob {
                  last_rebuilt_at    = VALUES(last_rebuilt_at)",
             $values
         );
+        // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 
+        // $sql was built with $wpdb->prepare() immediately above.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $result = $wpdb->query($sql);
 
         if ($result === false) {
@@ -200,6 +218,7 @@ class StatsRebuildJob {
         }
 
         // Sweep orphans: conversion combos no longer present in Redis.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
         $deleted = $wpdb->query(
             $wpdb->prepare(
                 "DELETE FROM {$statsTable} WHERE last_rebuilt_at < %s",

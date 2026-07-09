@@ -12,8 +12,18 @@
  * It is never loaded at runtime and is not shipped with the plugin.
  */
 
+// Block direct web access, but allow PHPStan (which loads this file on the
+// CLI, where ABSPATH is not defined) to read the constant definitions below.
+if (!defined('ABSPATH') && PHP_SAPI !== 'cli') {
+    exit;
+}
+
 // Time constant (wp-includes/default-constants.php, since WP 3.5).
-define('HOUR_IN_SECONDS', 3600);
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
 
 // wpdb::get_results() output type constants (wp-includes/wp-db.php).
-define('ARRAY_A', 'ARRAY_A');
+if (!defined('ARRAY_A')) {
+    define('ARRAY_A', 'ARRAY_A');
+}

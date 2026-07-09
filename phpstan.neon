@@ -9,7 +9,7 @@ parameters:
     # third-party and not maintained here, so it is not scanned.
     paths:
         - includes
-        - ab-test-flagship.php
+        - server-side-a-b-testing.php
 
     # Target the plugin's minimum supported PHP version, not the 8.3 the
     # CLI happens to run. This makes PHPStan validate against what users
