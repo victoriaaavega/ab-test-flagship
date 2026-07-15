@@ -16,6 +16,8 @@
 /readme.html
 /wp-*.php
 /xmlrpc.php
+*.sql
+backup_*.sql
 
 # Configuration
 wp-config.php

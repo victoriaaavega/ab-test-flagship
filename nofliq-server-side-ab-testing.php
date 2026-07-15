@@ -28,6 +28,7 @@ require_once NOFLIQ_PLUGIN_DIR . 'includes/Fingerprint.php';
 require_once NOFLIQ_PLUGIN_DIR . 'includes/RedisClient.php';
 require_once NOFLIQ_PLUGIN_DIR . 'includes/HitCacheRedis.php';
 require_once NOFLIQ_PLUGIN_DIR . 'includes/Database.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/DecisionMode.php';
 
 // Adapters and decision logic
 require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/DecisionAdapterInterface.php';

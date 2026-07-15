@@ -12,7 +12,7 @@ class Database
 {
 
     // Bump version to trigger dbDelta on schema changes
-    private const TABLE_VERSION = '1.3';
+    private const TABLE_VERSION = '1.4';
 
     /**
      * Creates the required tables only if they haven't been created yet
@@ -131,6 +131,11 @@ class Database
 
     /**
      * Creates the experiments table for the admin CRUD UI
+     * 
+     * variant_a / variant_b name the two variants of the experiment. In local
+     * mode LocalAdapter buckets visitors between them; in Flagship mode they
+     * document what the campaign returns, so the reporting labels line up.
+     * variant_a is the baseline the growth column compares against.
      */
     private function createExperimentsTable(): void
     {
@@ -146,6 +151,8 @@ class Database
             selector      VARCHAR(255) NOT NULL,
             event_name    VARCHAR(100) NOT NULL,
             event_type    VARCHAR(50)  DEFAULT 'click' NOT NULL,
+            variant_a     VARCHAR(100) DEFAULT 'control' NOT NULL,
+            variant_b     VARCHAR(100) DEFAULT 'variation_b' NOT NULL,
             urls          TEXT         NOT NULL,
             status        VARCHAR(20)  DEFAULT 'active' NOT NULL,
             created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -196,6 +203,11 @@ class Database
      * survives a Redis restart or outage.
      *
      * One row per experiment + variant + event combination.
+     * 
+     * mode records which engine produced the row. Redis snapshots are written
+     * as 'flagship'; rows written directly by ConversionTracker when Redis is
+     * down in local mode are 'local'. StatsRebuildJob only sweeps 'flagship'
+     * rows, so a Redis recovery never deletes locally recorded conversions.
      */
     private function createConversionsStatsTable(): void
     {
@@ -211,6 +223,7 @@ class Database
             event_name          VARCHAR(100) NOT NULL,
             unique_conversions  BIGINT(20)   NOT NULL DEFAULT 0,
             total_conversions   BIGINT(20)   NOT NULL DEFAULT 0,
+            mode                VARCHAR(20)  DEFAULT 'flagship' NOT NULL,
             last_rebuilt_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY experiment_variant_event (experiment_id, variant, event_name)
