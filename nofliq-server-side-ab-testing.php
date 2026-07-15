@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Plugin Name: Server-Side A/B Testing
+ * Plugin Name: Nofliq Server-Side A/B Testing
  * Description: No-flicker server-side A/B testing. Integrates with AB Tasty Flagship.
  * Version: 1.8.0
  * Author: Victoria Vega
@@ -9,47 +9,47 @@
  * Requires PHP: 8.1
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: server-side-a-b-testing
+ * Text Domain: nofliq-server-side-ab-testing
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ABTF_VERSION', '1.8.0');
-define('ABTF_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('ABTF_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('NOFLIQ_VERSION', '1.8.0');
+define('NOFLIQ_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('NOFLIQ_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Dependencies and utilities
-require_once ABTF_PLUGIN_DIR . 'vendor/autoload.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Logger.php';
-require_once ABTF_PLUGIN_DIR . 'includes/VisitorIdProvider.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Fingerprint.php';
-require_once ABTF_PLUGIN_DIR . 'includes/RedisClient.php';
-require_once ABTF_PLUGIN_DIR . 'includes/HitCacheRedis.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Database.php';
+require_once NOFLIQ_PLUGIN_DIR . 'vendor/autoload.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Logger.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/VisitorIdProvider.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Fingerprint.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/RedisClient.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/HitCacheRedis.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Database.php';
 
 // Adapters and decision logic
-require_once ABTF_PLUGIN_DIR . 'includes/adapters/DecisionAdapterInterface.php';
-require_once ABTF_PLUGIN_DIR . 'includes/adapters/SimulatorAdapter.php';
-require_once ABTF_PLUGIN_DIR . 'includes/adapters/FlagshipAdapter.php';
-require_once ABTF_PLUGIN_DIR . 'includes/FlagshipActivator.php';
-require_once ABTF_PLUGIN_DIR . 'includes/ExperimentRunner.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/DecisionAdapterInterface.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/SimulatorAdapter.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/FlagshipAdapter.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/FlagshipActivator.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/ExperimentRunner.php';
 
 // APIs, controllers, and UI
-require_once ABTF_PLUGIN_DIR . 'includes/ConversionTracker.php';
-require_once ABTF_PLUGIN_DIR . 'includes/RateLimiter.php';
-require_once ABTF_PLUGIN_DIR . 'includes/EventEndpoint.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/MetaBox.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/ExperimentsPage.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Dashboard/ReportingPage.php';
-require_once ABTF_PLUGIN_DIR . 'includes/AutoInjector.php';
-require_once ABTF_PLUGIN_DIR . 'includes/StatsRebuildJob.php';
-require_once ABTF_PLUGIN_DIR . 'includes/CronManager.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Encryption.php';
-require_once ABTF_PLUGIN_DIR . 'includes/CredentialsManager.php';
-require_once ABTF_PLUGIN_DIR . 'includes/Settings.php';
-require_once ABTF_PLUGIN_DIR . 'includes/IdentifyEndpoint.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/ConversionTracker.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/RateLimiter.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/EventEndpoint.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Dashboard/MetaBox.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Dashboard/ExperimentsPage.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Dashboard/ReportingPage.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/AutoInjector.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/StatsRebuildJob.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/CronManager.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Encryption.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/CredentialsManager.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/Settings.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/IdentifyEndpoint.php';
 
 // -----------------------------------------------------------------------------
 // Bootstrap — runs after all plugins are loaded
@@ -108,9 +108,9 @@ function abtf_enqueue_scripts(): void
 
     wp_enqueue_script(
         'abtf-event-tracker',
-        ABTF_PLUGIN_URL . 'assets/js/event-tracker.js',
+        NOFLIQ_PLUGIN_URL . 'assets/js/event-tracker.js',
         [],
-        ABTF_VERSION,
+        NOFLIQ_VERSION,
         true
     );
 
@@ -119,9 +119,9 @@ function abtf_enqueue_scripts(): void
     if (VisitorIdProvider::usesExternalId()) {
         wp_enqueue_script(
             'abtf-visitor-sync',
-            ABTF_PLUGIN_URL . 'assets/js/visitor-sync.js',
+            NOFLIQ_PLUGIN_URL . 'assets/js/visitor-sync.js',
             [],
-            ABTF_VERSION,
+            NOFLIQ_VERSION,
             true
         );
     }

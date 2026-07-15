@@ -1,4 +1,4 @@
-=== Server-Side A/B Testing ===
+=== Nofliq Server-Side A/B Testing ===
 Contributors: victoriavegab
 Tags: a/b testing, split testing, experiments, server-side, flagship
 Requires at least: 6.5

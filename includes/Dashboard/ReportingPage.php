@@ -73,7 +73,7 @@ class ReportingPage
     private function handleRebuildStats(): void
     {
         if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have permission to perform this action.', 'server-side-a-b-testing'), 403);
+            wp_die(esc_html__('You do not have permission to perform this action.', 'nofliq-server-side-ab-testing'), 403);
         }
 
         check_admin_referer('abtf_rebuild_stats');

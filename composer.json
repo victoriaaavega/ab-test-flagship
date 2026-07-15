@@ -1,5 +1,5 @@
 {
-    "name": "victoriavega/server-side-a-b-testing",
+    "name": "victoriavega/nofliq-server-side-ab-testing",
     "description": "WordPress plugin for server-side A/B testing using the AB Tasty Flagship SDK. Eliminates flicker by deciding variants in PHP before rendering HTML.",
     "license": "GPL-2.0-or-later",
     "authors": [

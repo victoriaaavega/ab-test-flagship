@@ -50,7 +50,7 @@ class ExperimentsPage
     {
         if (!current_user_can('manage_options')) {
             wp_die(
-                esc_html__('You do not have permission to perform this action.', 'server-side-a-b-testing'),
+                esc_html__('You do not have permission to perform this action.', 'nofliq-server-side-ab-testing'),
                 403
             );
         }
