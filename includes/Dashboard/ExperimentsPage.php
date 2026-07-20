@@ -189,8 +189,10 @@ class ExperimentsPage
         $eventName = sanitize_text_field(wp_unslash($_POST['event_name'] ?? ''));
         $eventType = sanitize_text_field(wp_unslash($_POST['event_type'] ?? 'click'));
         $urls      = sanitize_textarea_field(wp_unslash($_POST['urls']   ?? ''));
+        $variantA  = sanitize_text_field(wp_unslash($_POST['variant_a']  ?? 'control'));
+        $variantB  = sanitize_text_field(wp_unslash($_POST['variant_b']  ?? 'variation_b'));
 
-        if (!$this->validateFields([$flagKey, $name, $selector, $eventName, $eventType, $urls])) {
+        if (!$this->validateFields([$flagKey, $name, $selector, $eventName, $eventType, $urls, $variantA, $variantB])) {
             wp_safe_redirect($this->redirectUrl([], 'invalid_field', 'error'));
             exit;
         }
@@ -214,10 +216,9 @@ class ExperimentsPage
             'event_name' => $eventName,
             'event_type' => $eventType,
             'urls'       => $urls,
-            // New experiments start paused so the configuration (selector, URLs,
-            // flag key) can be reviewed before the experiment goes live. Only
-            // active experiments are injected and assigned, so a paused start
-            // prevents variant assignments from being cached before verification.
+            'variant_a'  => $variantA,
+            'variant_b'  => $variantB,
+            // New experiments start paused
             'status'     => 'paused',
         ]);
 
@@ -249,8 +250,10 @@ class ExperimentsPage
         $eventName = sanitize_text_field(wp_unslash($_POST['event_name'] ?? ''));
         $eventType = sanitize_text_field(wp_unslash($_POST['event_type'] ?? 'click'));
         $urls      = sanitize_textarea_field(wp_unslash($_POST['urls']   ?? ''));
+        $variantA  = sanitize_text_field(wp_unslash($_POST['variant_a']  ?? 'control'));
+        $variantB  = sanitize_text_field(wp_unslash($_POST['variant_b']  ?? 'variation_b'));
 
-        if (!$this->validateFields([$name, $selector, $eventName, $eventType, $urls])) {
+        if (!$this->validateFields([$name, $selector, $eventName, $eventType, $urls, $variantA, $variantB])) {
             wp_safe_redirect($this->redirectUrl(['action' => 'edit', 'id' => $id], 'invalid_field', 'error'));
             exit;
         }
@@ -263,6 +266,8 @@ class ExperimentsPage
                 'event_name' => $eventName,
                 'event_type' => $eventType,
                 'urls'       => $urls,
+                'variant_a'  => $variantA,
+                'variant_b'  => $variantB,
             ],
             ['id' => $id]
         );
@@ -534,6 +539,28 @@ class ExperimentsPage
                                 </p>
                             </td>
                         </tr>
+                        <tr>
+                            <th scope="row"><label for="edit_variant_a">Variant A (baseline)</label></th>
+                            <td>
+                                <input name="variant_a" type="text" id="edit_variant_a" class="regular-text"
+                                    value="<?php echo esc_attr($exp->variant_a); ?>" required>
+                                <p class="description">
+                                    The baseline variant. In Flagship mode this must match the variant name
+                                    Flagship returns; growth is measured against this one. Usually <code>control</code>.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="edit_variant_b">Variant B</label></th>
+                            <td>
+                                <input name="variant_b" type="text" id="edit_variant_b" class="regular-text"
+                                    value="<?php echo esc_attr($exp->variant_b); ?>" required>
+                                <p class="description">
+                                    The challenger variant. In Flagship mode this must match the variant name
+                                    Flagship returns (e.g. <code>v1</code>).
+                                </p>
+                            </td>
+                        </tr>
                     </table>
 
                     <?php submit_button('Save Changes', 'primary'); ?>
@@ -598,6 +625,27 @@ class ExperimentsPage
                                 required placeholder="/, /talent/*"></textarea>
                             <p class="description">
                                 Comma-separated. Use <code>*</code> for wildcards (e.g., <code>/blog/*</code>).
+                            </p>
+                        </td>
+                    </tr>
+                <tr>
+                        <th scope="row"><label for="variant_a">Variant A (baseline)</label></th>
+                        <td>
+                            <input name="variant_a" type="text" id="variant_a" class="regular-text"
+                                required value="control">
+                            <p class="description">
+                                The baseline. Growth is measured against this one. In Flagship mode it must
+                                match the variant name Flagship returns. Usually <code>control</code>.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="variant_b">Variant B</label></th>
+                        <td>
+                            <input name="variant_b" type="text" id="variant_b" class="regular-text"
+                                required placeholder="E.g.: v1">
+                            <p class="description">
+                                The challenger. In Flagship mode it must match the variant name Flagship returns.
                             </p>
                         </td>
                     </tr>

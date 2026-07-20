@@ -32,7 +32,7 @@ require_once NOFLIQ_PLUGIN_DIR . 'includes/DecisionMode.php';
 
 // Adapters and decision logic
 require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/DecisionAdapterInterface.php';
-require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/SimulatorAdapter.php';
+require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/LocalAdapter.php';
 require_once NOFLIQ_PLUGIN_DIR . 'includes/adapters/FlagshipAdapter.php';
 require_once NOFLIQ_PLUGIN_DIR . 'includes/FlagshipActivator.php';
 require_once NOFLIQ_PLUGIN_DIR . 'includes/ExperimentRunner.php';
@@ -190,9 +190,12 @@ function abtf_runner(): ExperimentRunner
     static $runner = null;
 
     if ($runner === null) {
-        $adapter = CredentialsManager::hasCredentials()
-            ? new FlagshipAdapter()
-            : new SimulatorAdapter();
+        // The decision engine is chosen by the administrator's explicit mode
+        // setting, never inferred from whether credentials happen to exist.
+        // Local mode uses the plugin's own engine; Flagship mode uses AB Tasty.
+        $adapter = DecisionMode::isLocal()
+            ? new LocalAdapter()
+            : new FlagshipAdapter();
 
         $runner = new ExperimentRunner($adapter);
     }
