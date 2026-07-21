@@ -23,6 +23,8 @@ class Settings
         add_action('admin_menu',    [$this, 'addMenuPage']);
         add_action('admin_init',    [$this, 'handleWrites']);
         add_action('admin_notices', [$this, 'renderNotice']);
+        add_action('admin_notices', [$this, 'renderLocalModeBanner']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
     }
 
     public function addMenuPage(): void
@@ -34,6 +36,21 @@ class Settings
             'manage_options',
             self::MENU_SLUG,
             [$this, 'renderPage']
+        );
+    }
+
+    public function enqueueAssets(string $hook): void
+    {
+        if (!str_contains($hook, self::MENU_SLUG)) {
+            return;
+        }
+
+        wp_enqueue_script(
+            'abtf-settings-admin',
+            NOFLIQ_PLUGIN_URL . 'assets/js/settings-admin.js',
+            [],
+            NOFLIQ_VERSION,
+            true
         );
     }
 
@@ -61,6 +78,7 @@ class Settings
             'save'             => $this->handleSave(),
             'delete'           => $this->handleDelete(),
             'save_provider'    => $this->handleSaveProvider(),
+            'save_mode'        => $this->handleSaveMode(),
             default            => null,
         };
     }
@@ -110,6 +128,17 @@ class Settings
         $this->redirect($ok ? 'provider_saved' : 'provider_invalid', $ok ? 'success' : 'error');
     }
 
+    private function handleSaveMode(): void
+    {
+        check_admin_referer('abtf_save_mode');
+
+        $mode = sanitize_key($_POST['decision_engine'] ?? '');
+
+        $ok = DecisionMode::save($mode);
+
+        $this->redirect($ok ? 'mode_saved' : 'mode_invalid', $ok ? 'success' : 'error');
+    }
+
     private function redirect(string $notice, string $type): void
     {
         wp_safe_redirect(add_query_arg([
@@ -132,6 +161,8 @@ class Settings
         'provider_saved'           => 'Visitor ID provider saved successfully.',
         'provider_invalid'         => 'Invalid provider selected.',
         'provider_js_path_required'=> 'A JavaScript path is required for the Custom provider.',
+        'mode_saved'               => 'Decision engine updated.',
+        'mode_invalid'             => 'Invalid decision engine selected.',
     ];
 
     public function renderNotice(): void
@@ -155,6 +186,25 @@ class Settings
             esc_attr($type),
             esc_html(self::NOTICE_MESSAGES[$key])
         );
+    }
+
+    /**
+     * Persistent banner shown across the admin whenever Local mode is active,
+     * so the operator is never unaware that variants are being decided locally
+     * instead of by Flagship. Deliberately not dismissible: the mode is a
+     * standing state, not a one-off event.
+     */
+    public function renderLocalModeBanner(): void
+    {
+        if (!DecisionMode::isLocal()) {
+            return;
+        }
+
+        echo '<div class="notice notice-info"><p>';
+        echo '<strong>Nofliq: Local mode active.</strong> ';
+        echo 'Variants are decided on this server and no data is sent to Flagship. ';
+        echo 'Switch to Flagship in AB Tests → Settings to use AB Tasty.';
+        echo '</p></div>';
     }
 
     // -------------------------------------------------------------------------
@@ -251,7 +301,57 @@ class Settings
                     <?php echo esc_html($status['label']); ?>
                 </span>
             </div>
+            <!-- Section: Decision Engine -->
+            <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 600px; margin-top: 16px;">
+                <h2 style="margin-top: 0;">Decision Engine</h2>
+                <p style="color: #555; margin-bottom: 20px;">
+                    Chooses how variants are decided. <strong>Flagship</strong> uses AB Tasty
+                    for remote targeting, segmentation and its dashboard (requires credentials).
+                    <strong>Local</strong> decides variants on this server with no external
+                    service and no data leaving the site — useful for evaluation or for running
+                    simple experiments without an AB Tasty account.
+                </p>
 
+                <?php $currentMode = DecisionMode::get(); ?>
+
+                <form method="post" action="">
+                    <?php wp_nonce_field('abtf_save_mode'); ?>
+                    <input type="hidden" name="abtf_settings_action" value="save_mode">
+
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row">Engine</th>
+                            <td>
+                                <fieldset>
+                                    <label style="display: block; margin-bottom: 10px;">
+                                        <input type="radio"
+                                            name="decision_engine"
+                                            value="flagship"
+                                            <?php checked($currentMode, DecisionMode::MODE_FLAGSHIP); ?>>
+                                        <strong>Flagship</strong> (recommended)
+                                        <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
+                                            Variants decided by AB Tasty Flagship. Requires credentials above.
+                                        </span>
+                                    </label>
+
+                                    <label style="display: block; margin-bottom: 10px;">
+                                        <input type="radio"
+                                            name="decision_engine"
+                                            value="local"
+                                            <?php checked($currentMode, DecisionMode::MODE_LOCAL); ?>>
+                                        <strong>Local</strong>
+                                        <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
+                                            Variants decided locally, no Flagship call. No data leaves your site.
+                                        </span>
+                                    </label>
+                                </fieldset>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <?php submit_button('Save Engine', 'primary', 'submit', false); ?>
+                </form>
+            </div>
             <!-- Section 3: Visitor ID Provider -->
             <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 600px; margin-top: 16px;">
                 <h2 style="margin-top: 0;">Visitor ID Provider</h2>
@@ -275,8 +375,7 @@ class Settings
                                         <input type="radio"
                                             name="visitor_id_provider"
                                             value="fingerprint"
-                                            <?php checked($currentProvider, 'fingerprint'); ?>
-                                            onchange="abtfToggleJsPath(this.value)">
+                                            <?php checked($currentProvider, 'fingerprint'); ?>>
                                         <strong>Fingerprint</strong>
                                         <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
                                             SHA256 of IP + User-Agent + Accept-Language. No JavaScript dependency.
@@ -288,8 +387,7 @@ class Settings
                                         <input type="radio"
                                             name="visitor_id_provider"
                                             value="heap"
-                                            <?php checked($currentProvider, 'heap'); ?>
-                                            onchange="abtfToggleJsPath(this.value)">
+                                            <?php checked($currentProvider, 'heap'); ?>>
                                         <strong>Heap</strong>
                                         <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
                                             Reads <code>window.heap.userId</code>. Requires the Heap Analytics snippet
@@ -301,8 +399,7 @@ class Settings
                                         <input type="radio"
                                             name="visitor_id_provider"
                                             value="custom"
-                                            <?php checked($currentProvider, 'custom'); ?>
-                                            onchange="abtfToggleJsPath(this.value)">
+                                            <?php checked($currentProvider, 'custom'); ?>>
                                         <strong>Custom</strong>
                                         <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
                                             Read an ID from any JavaScript variable available on the page.
@@ -333,15 +430,6 @@ class Settings
                 </form>
             </div>
         </div>
-
-        <script>
-            function abtfToggleJsPath(provider) {
-                var row = document.getElementById('abtf-js-path-row');
-                if (row) {
-                    row.style.display = provider === 'custom' ? '' : 'none';
-                }
-            }
-        </script>
 <?php
     }
 }

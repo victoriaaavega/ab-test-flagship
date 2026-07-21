@@ -27,3 +27,17 @@ if (!defined('HOUR_IN_SECONDS')) {
 if (!defined('ARRAY_A')) {
     define('ARRAY_A', 'ARRAY_A');
 }
+
+// Plugin constants (defined in the main plugin file, which is out of scope for
+// the classes in includes/). Declared here so static analysis can resolve them.
+if (!defined('NOFLIQ_VERSION')) {
+    define('NOFLIQ_VERSION', '1.8.0');
+}
+
+if (!defined('NOFLIQ_PLUGIN_URL')) {
+    define('NOFLIQ_PLUGIN_URL', 'https://example.test/wp-content/plugins/nofliq-server-side-ab-testing/');
+}
+
+if (!defined('NOFLIQ_PLUGIN_DIR')) {
+    define('NOFLIQ_PLUGIN_DIR', '/var/www/wp-content/plugins/nofliq-server-side-ab-testing/');
+}
