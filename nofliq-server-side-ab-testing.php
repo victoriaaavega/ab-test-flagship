@@ -139,6 +139,17 @@ function abtf_enqueue_scripts(): void
         // that controls PHP logging. True only when the level includes debug.
         'debug'             => Logger::isDebug(),
     ]);
+
+    // Expose the AB test decision for this page as inline JS attached to the
+    // tracker handle, so it is emitted before event-tracker.js runs. Replaces
+    // the former raw <script> printed on wp_footer (WordPress.org: no inline
+    // <script> tags; use wp_add_inline_script).
+    $injector   = new AutoInjector();
+    $inlineData = $injector->buildInlineData();
+
+    if ($inlineData !== '') {
+        wp_add_inline_script('abtf-event-tracker', $inlineData, 'before');
+    }
 }
 add_action('wp_enqueue_scripts', 'abtf_enqueue_scripts');
 
@@ -212,9 +223,6 @@ function abtf_init(): void
     $database = new Database();
     $database->maybeCreateTable();
 
-    if (!is_admin()) {
-        new AutoInjector();
-    }
 }
 add_action('init', 'abtf_init');
 
