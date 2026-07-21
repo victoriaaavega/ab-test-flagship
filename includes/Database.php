@@ -12,7 +12,7 @@ class Database
 {
 
     // Bump version to trigger dbDelta on schema changes
-    private const TABLE_VERSION = '1.4';
+    private const TABLE_VERSION = '1.5';
 
     /**
      * Creates the required tables only if they haven't been created yet
@@ -27,6 +27,7 @@ class Database
         $this->createExperimentsTable();
         $this->createStatsTable();
         $this->createConversionsStatsTable();
+        $this->createConversionsLocalTable();
 
         update_option('ab_test_table_version', self::TABLE_VERSION);
     }
@@ -227,6 +228,43 @@ class Database
             last_rebuilt_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY experiment_variant_event (experiment_id, variant, event_name)
+        ) {$charset};";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta($sql);
+
+        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+    }
+
+    /**
+     * Creates the local conversions table — the persistent store for
+     * conversions recorded directly in local mode when Redis is unavailable.
+     *
+     * One row per unique (experiment + variant + event + visitor). The UNIQUE
+     * KEY plus INSERT IGNORE means a visitor is counted once per goal no matter
+     * how many times they click, so COUNT(*) over a combo yields the unique
+     * conversion count without needing Redis' HyperLogLog.
+     *
+     * This table is independent of ab_test_conversions_stats: it is never
+     * touched by StatsRebuildJob's Redis snapshot or its orphan sweep, so a
+     * Redis recovery can never delete locally recorded conversions.
+     */
+    private function createConversionsLocalTable(): void
+    {
+        global $wpdb;
+
+        $charset   = $wpdb->get_charset_collate();
+        $tableName = $wpdb->prefix . 'ab_test_conversions_local';
+
+        $sql = "CREATE TABLE {$tableName} (
+            id            BIGINT(20)   NOT NULL AUTO_INCREMENT,
+            experiment_id VARCHAR(100) NOT NULL,
+            variant       VARCHAR(100) NOT NULL,
+            event_name    VARCHAR(100) NOT NULL,
+            visitor_id    VARCHAR(255) NOT NULL,
+            created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY experiment_variant_event_visitor (experiment_id, variant, event_name, visitor_id)
         ) {$charset};";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';

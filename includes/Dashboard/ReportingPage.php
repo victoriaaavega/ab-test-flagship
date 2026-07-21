@@ -165,6 +165,14 @@ class ReportingPage
 
     private function renderSourceNotice(string $source, string $lastRebuiltAt): void
     {
+        if ($source === 'local') {
+            echo '<div class="notice notice-warning inline" style="margin-top: 12px;"><p>';
+            echo '<strong>Local mode.</strong> Conversions are recorded locally (Redis not in use). ';
+            echo 'The Total column mirrors Unique in this mode.';
+            echo '</p></div>';
+            return;
+        }
+    
         if ($source === 'redis') {
             echo '<p style="margin-top: 12px; color: #2e7d32;">';
             echo '● Live data from Redis (real time).';
@@ -305,6 +313,13 @@ class ReportingPage
             return [$tracker->listAll(), 'redis', ''];
         }
 
+        // Redis is down. In local mode conversions were written to the local
+        // SQL table by ConversionTracker; read them from there. Otherwise fall
+        // back to the periodic Redis snapshot.
+        if (DecisionMode::isLocal()) {
+            return [$this->fetchConversionDataFromLocal(), 'local', ''];
+        }
+
         return $this->fetchConversionDataFromSql();
     }
 
@@ -348,6 +363,51 @@ class ReportingPage
         }
 
         return [$rows, 'sql', $lastRebuiltAt];
+    }
+
+    /**
+     * Reads conversions recorded locally (local mode, Redis down).
+     *
+     * unique = COUNT(*) over the combo (the UNIQUE KEY guarantees one row per
+     * visitor). total is reported equal to unique: local mode does not track a
+     * separate all-clicks counter (see the plugin's local-mode design), so the
+     * honest value is the unique count rather than a fabricated total.
+     *
+     * @return array<int, array{experiment_id: string, variant: string, event_name: string, total: int, unique: int}>
+     */
+    private function fetchConversionDataFromLocal(): array
+    {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'ab_test_conversions_local';
+
+        // Table name comes from $wpdb->prefix (not user input) and cannot be
+        // passed through prepare(). No user data is interpolated.
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $results = $wpdb->get_results(
+            "SELECT experiment_id, variant, event_name, COUNT(*) AS unique_conversions
+             FROM {$table}
+             GROUP BY experiment_id, variant, event_name",
+            ARRAY_A
+        );
+
+        if (empty($results)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($results as $r) {
+            $unique = (int) $r['unique_conversions'];
+            $rows[] = [
+                'experiment_id' => $r['experiment_id'],
+                'variant'       => $r['variant'],
+                'event_name'    => $r['event_name'],
+                'unique'        => $unique,
+                'total'         => $unique, // local mode: total mirrors unique
+            ];
+        }
+
+        return $rows;
     }
 
     /**

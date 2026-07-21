@@ -59,6 +59,13 @@ class ConversionTracker
         $redis = $this->getConnection();
 
         if ($redis === null) {
+            // Redis is down. In local mode the plugin is the only place a
+            // conversion can live, so persist it to SQL. In Flagship mode the
+            // hit still reaches Flagship (the caller sends it), so we keep the
+            // historical fail-open behaviour and skip the SQL write.
+            if (DecisionMode::isLocal()) {
+                return $this->recordLocal($experimentId, $variant, $eventName, $visitorId);
+            }
             return false;
         }
 
@@ -76,6 +83,51 @@ class ConversionTracker
             error_log('[AB Test] ConversionTracker record error: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Persists a conversion to SQL when Redis is unavailable in local mode.
+     *
+     * One row per unique (experiment + variant + event + visitor). INSERT
+     * IGNORE against the UNIQUE KEY means repeat clicks by the same visitor are
+     * dropped silently, so COUNT(*) over a combo is the unique conversion count
+     * (see Database::createConversionsLocalTable).
+     *
+     * @return bool True if a new unique row was inserted; false on a duplicate
+     *              (already converted) or a SQL error. Both mean "no new unique
+     *              conversion stored", which the endpoint reports honestly.
+     */
+    private function recordLocal(
+        string $experimentId,
+        string $variant,
+        string $eventName,
+        string $visitorId
+    ): bool {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'ab_test_conversions_local';
+
+        $result = $wpdb->query(
+            $wpdb->prepare(
+                "INSERT IGNORE INTO {$table}
+                    (experiment_id, variant, event_name, visitor_id)
+                 VALUES (%s, %s, %s, %s)",
+                $experimentId,
+                $variant,
+                $eventName,
+                $visitorId
+            )
+        );
+
+        if ($result === false) {
+            error_log('[AB Test] ConversionTracker recordLocal error: ' . ($wpdb->last_error ?: 'unknown'));
+            return false;
+        }
+
+        Logger::debug("Conversion recorded locally (SQL). Experiment: {$experimentId}, Variant: {$variant}, Event: {$eventName}");
+
+        // 1 = new unique inserted, 0 = duplicate ignored.
+        return $result === 1;
     }
 
     /**
