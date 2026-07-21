@@ -307,17 +307,19 @@ class ReportingPage
      */
     private function fetchConversionData(): array
     {
+        // In local mode conversions always live in the local SQL table,
+        // regardless of whether Redis happens to be up — so read from there
+        // first. This keeps reporting consistent with how local mode records
+        // conversions and avoids showing an empty Redis DB 3 while real data
+        // sits in SQL.
+        if (DecisionMode::isLocal()) {
+            return [$this->fetchConversionDataFromLocal(), 'local', ''];
+        }
+
         $tracker = new ConversionTracker();
 
         if ($tracker->isAvailable()) {
             return [$tracker->listAll(), 'redis', ''];
-        }
-
-        // Redis is down. In local mode conversions were written to the local
-        // SQL table by ConversionTracker; read them from there. Otherwise fall
-        // back to the periodic Redis snapshot.
-        if (DecisionMode::isLocal()) {
-            return [$this->fetchConversionDataFromLocal(), 'local', ''];
         }
 
         return $this->fetchConversionDataFromSql();

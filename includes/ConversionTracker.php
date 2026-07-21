@@ -56,16 +56,18 @@ class ConversionTracker
         string $eventName,
         string $visitorId
     ): bool {
+        // In local mode conversions always live in SQL, never in Redis. The
+        // local engine decides variants without Redis, so conversion tracking
+        // stays consistent: one storage path, Redis-independent, no orphaned
+        // rows when Redis comes back. Redis DB 3 is used for conversions only
+        // in Flagship mode.
+        if (DecisionMode::isLocal()) {
+            return $this->recordLocal($experimentId, $variant, $eventName, $visitorId);
+        }
+
         $redis = $this->getConnection();
 
         if ($redis === null) {
-            // Redis is down. In local mode the plugin is the only place a
-            // conversion can live, so persist it to SQL. In Flagship mode the
-            // hit still reaches Flagship (the caller sends it), so we keep the
-            // historical fail-open behaviour and skip the SQL write.
-            if (DecisionMode::isLocal()) {
-                return $this->recordLocal($experimentId, $variant, $eventName, $visitorId);
-            }
             return false;
         }
 
