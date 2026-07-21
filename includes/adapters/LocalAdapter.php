@@ -41,7 +41,7 @@ class LocalAdapter implements DecisionAdapterInterface {
         $bucket  = abs(crc32($visitorId . $experimentId)) % 100;
         $variant = $bucket < 50 ? $variantA : $variantB;
 
-        Logger::debug("LocalAdapter decision for '{$experimentId}': {$variant} (bucket: {$bucket})");
+        Nofliq_Logger::debug("LocalAdapter decision for '{$experimentId}': {$variant} (bucket: {$bucket})");
 
         return [
             'variant'          => $variant,

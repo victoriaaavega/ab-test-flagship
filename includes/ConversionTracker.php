@@ -126,10 +126,18 @@ class ConversionTracker
             return false;
         }
 
-        Logger::debug("Conversion recorded locally (SQL). Experiment: {$experimentId}, Variant: {$variant}, Event: {$eventName}");
+        // $result: 1 = new unique inserted, 0 = duplicate ignored by INSERT
+        // IGNORE. A duplicate is NOT a failure — the visitor already converted
+        // for this goal, which is exactly what "unique" means. Both outcomes
+        // mean "the conversion is recorded", so both report success. Only a
+        // real SQL error (handled above) returns false.
+        if ($result === 1) {
+            Nofliq_Logger::debug("Conversion recorded locally (SQL). Experiment: {$experimentId}, Variant: {$variant}, Event: {$eventName}");
+        } else {
+            Nofliq_Logger::debug("Conversion already recorded for this visitor (local, duplicate ignored). Experiment: {$experimentId}, Event: {$eventName}");
+        }
 
-        // 1 = new unique inserted, 0 = duplicate ignored.
-        return $result === 1;
+        return true;
     }
 
     /**

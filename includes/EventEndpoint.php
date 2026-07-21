@@ -26,12 +26,12 @@ class EventEndpoint
     private const FLAGSHIP_EVENTS_URL = 'https://events.flagship.io';
     private const REQUEST_TIMEOUT     = 5; // seconds
 
-    private RateLimiter $rateLimiter;
+    private Nofliq_RateLimiter $rateLimiter;
     private ConversionTracker $conversionTracker;
 
     public function __construct()
     {
-        $this->rateLimiter       = new RateLimiter();
+        $this->rateLimiter       = new Nofliq_RateLimiter();
         $this->conversionTracker = new ConversionTracker();
         add_action('rest_api_init', [$this, 'registerRoute']);
     }
@@ -137,7 +137,7 @@ class EventEndpoint
         // one. In practice event-tracker.js always sends window.location.href.
         $pageUrl      = $request->get_param('page_url') ?: null;
 
-        Logger::debug("Event received. Experiment: {$experimentId}, Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
+        Nofliq_Logger::debug("Event received. Experiment: {$experimentId}, Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}");
 
         // 1. Record the conversion internally FIRST — this is independent of
         //    Flagship and feeds the live Reporting dashboard. Fails silently if
@@ -148,7 +148,7 @@ class EventEndpoint
             // Redis down (or record failed). The conversion could not be stored
             // in the live counters. We still attempt Flagship below so the data
             // is not lost entirely, but we report the internal failure honestly.
-            Logger::error("ConversionTracker did not record event. Experiment: {$experimentId}, Event: {$eventName} (Redis may be down).");
+            Nofliq_Logger::error("ConversionTracker did not record event. Experiment: {$experimentId}, Event: {$eventName} (Redis may be down).");
         }
 
         // 2. Best-effort secondary delivery to Flagship. Never blocks or
@@ -216,7 +216,7 @@ class EventEndpoint
         $envId = CredentialsManager::getEnvId();
 
         if ($envId === null) {
-            Logger::error('Flagship credentials not found. Hit not sent.');
+            Nofliq_Logger::error('Flagship credentials not found. Hit not sent.');
             return ['success' => false, 'message' => 'Flagship credentials not configured.'];
         }
 
@@ -243,7 +243,7 @@ class EventEndpoint
         // but guard anyway: sending body=false would silently post an empty
         // hit to Flagship. Abort with a clear error instead.
         if ($body === false) {
-            Logger::error('EventEndpoint: failed to JSON-encode the hit payload. Hit not sent.');
+            Nofliq_Logger::error('EventEndpoint: failed to JSON-encode the hit payload. Hit not sent.');
             return ['success' => false, 'message' => 'Failed to encode hit payload.'];
         }
 
@@ -255,7 +255,7 @@ class EventEndpoint
 
         if (is_wp_error($response)) {
             $message = $response->get_error_message();
-            Logger::error("Flagship hit failed (wp_error): {$message}");
+            Nofliq_Logger::error("Flagship hit failed (wp_error): {$message}");
             return ['success' => false, 'message' => "Network error: {$message}"];
         }
 
@@ -263,12 +263,12 @@ class EventEndpoint
 
         if ($statusCode < 200 || $statusCode >= 300) {
             $body = wp_remote_retrieve_body($response);
-            Logger::error("Flagship hit failed. Status: {$statusCode}, Body: {$body}");
+            Nofliq_Logger::error("Flagship hit failed. Status: {$statusCode}, Body: {$body}");
             return ['success' => false, 'message' => "Flagship returned status {$statusCode}."];
         }
 
         $loggedUrl = $pageUrl ?? '(none)';
-        Logger::debug("Hit sent to Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}, Page: {$loggedUrl}");
+        Nofliq_Logger::debug("Hit sent to Flagship. Visitor: {$visitorId}, Event: {$eventName}, Variant: {$variant}, Page: {$loggedUrl}");
 
         return ['success' => true, 'message' => 'Hit sent successfully.'];
     }

@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
  * Handles all database operations for AB test variant storage
  * and experiment configurations.
  */
-class Database
+class Nofliq_Database
 {
 
     // Bump version to trigger dbDelta on schema changes

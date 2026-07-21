@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
  *
  * Messages are prefixed '[AB Test]' to match the existing log convention.
  */
-class Logger
+class Nofliq_Logger
 {
     private const LEVELS = [
         'error' => 0,

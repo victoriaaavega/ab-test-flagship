@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
  *   - an activation guard flag used to send the Flagship activate hit only
  *     once per visitor per experiment.
  */
-class RedisClient {
+class Nofliq_RedisClient {
 
     private static ?Redis $instance = null;
     private static bool $failed     = false;

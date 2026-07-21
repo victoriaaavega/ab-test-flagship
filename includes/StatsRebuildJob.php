@@ -49,7 +49,7 @@ class StatsRebuildJob {
 
         $rowsWritten = $assignments['rows_written'] + $conversions['rows_written'];
 
-        Logger::info("StatsRebuildJob completed. Assignment rows: {$assignments['rows_written']}, Conversion rows: {$conversions['rows_written']}, Duration: {$durationMs}ms.");
+        Nofliq_Logger::info("StatsRebuildJob completed. Assignment rows: {$assignments['rows_written']}, Conversion rows: {$conversions['rows_written']}, Duration: {$durationMs}ms.");
 
         return [
             'rows_written' => $rowsWritten,
@@ -86,12 +86,12 @@ class StatsRebuildJob {
 
         if ($rows === null) {
             $error = $wpdb->last_error ?: 'Unknown database error during assignment SELECT.';
-            Logger::error('StatsRebuildJob failed on assignment SELECT: ' . $error);
+            Nofliq_Logger::error('StatsRebuildJob failed on assignment SELECT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
         }
 
         if (empty($rows)) {
-            Logger::info('StatsRebuildJob: no assignment data found, nothing to write.');
+            Nofliq_Logger::info('StatsRebuildJob: no assignment data found, nothing to write.');
             return ['rows_written' => 0, 'error' => null];
         }
 
@@ -126,7 +126,7 @@ class StatsRebuildJob {
 
         if ($result === false) {
             $error = $wpdb->last_error ?: 'Unknown database error during assignment UPSERT.';
-            Logger::error('StatsRebuildJob failed on assignment UPSERT: ' . $error);
+            Nofliq_Logger::error('StatsRebuildJob failed on assignment UPSERT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
         }
 
@@ -142,9 +142,9 @@ class StatsRebuildJob {
         if ($deleted === false) {
             // Non-fatal: the upsert already succeeded and the data is correct;
             // only stale orphans may remain. Log and continue.
-            Logger::error('StatsRebuildJob: assignment orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
+            Nofliq_Logger::error('StatsRebuildJob: assignment orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
         } elseif ($deleted > 0) {
-            Logger::info("StatsRebuildJob: swept {$deleted} orphan assignment-stat row(s).");
+            Nofliq_Logger::info("StatsRebuildJob: swept {$deleted} orphan assignment-stat row(s).");
         }
 
         return ['rows_written' => (int) $result, 'error' => null];
@@ -162,14 +162,14 @@ class StatsRebuildJob {
         $tracker = new ConversionTracker();
 
         if (!$tracker->isAvailable()) {
-            Logger::info('StatsRebuildJob: Redis unavailable, skipping conversion snapshot.');
+            Nofliq_Logger::info('StatsRebuildJob: Redis unavailable, skipping conversion snapshot.');
             return ['rows_written' => 0, 'error' => null];
         }
 
         $combos = $tracker->listAll();
 
         if (empty($combos)) {
-            Logger::info('StatsRebuildJob: no conversion data in Redis, nothing to write.');
+            Nofliq_Logger::info('StatsRebuildJob: no conversion data in Redis, nothing to write.');
             return ['rows_written' => 0, 'error' => null];
         }
 
@@ -213,7 +213,7 @@ class StatsRebuildJob {
 
         if ($result === false) {
             $error = $wpdb->last_error ?: 'Unknown database error during conversion UPSERT.';
-            Logger::error('StatsRebuildJob failed on conversion UPSERT: ' . $error);
+            Nofliq_Logger::error('StatsRebuildJob failed on conversion UPSERT: ' . $error);
             return ['rows_written' => 0, 'error' => $error];
         }
 
@@ -227,9 +227,9 @@ class StatsRebuildJob {
         );
 
         if ($deleted === false) {
-            Logger::error('StatsRebuildJob: conversion orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
+            Nofliq_Logger::error('StatsRebuildJob: conversion orphan sweep failed: ' . ($wpdb->last_error ?: 'unknown'));
         } elseif ($deleted > 0) {
-            Logger::info("StatsRebuildJob: swept {$deleted} orphan conversion-stat row(s).");
+            Nofliq_Logger::info("StatsRebuildJob: swept {$deleted} orphan conversion-stat row(s).");
         }
 
         return ['rows_written' => (int) $result, 'error' => null];

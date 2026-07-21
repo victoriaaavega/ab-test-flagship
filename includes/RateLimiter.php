@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
  * Rate limiter for the AB Test event endpoint.
  * Uses Redis to track request counts per IP within a fixed time window.
  */
-class RateLimiter {
+class Nofliq_RateLimiter {
 
     private const REDIS_HOST     = '127.0.0.1';
     private const REDIS_PORT     = 6379;
@@ -58,7 +58,7 @@ class RateLimiter {
         }
 
         if (!$this->available || $this->redis === null) {
-            Logger::debug('RateLimiter: Redis unavailable, failing open.');
+            Nofliq_Logger::debug('RateLimiter: Redis unavailable, failing open.');
             return true;
         }
 
@@ -71,21 +71,21 @@ class RateLimiter {
             );
 
             if ($count === false) {
-                Logger::debug('RateLimiter: eval returned false, failing open.');
+                Nofliq_Logger::debug('RateLimiter: eval returned false, failing open.');
                 return true;
             }
 
             $allowed = (int) $count <= self::MAX_REQUESTS;
 
             if (!$allowed) {
-                Logger::info("RateLimiter: IP {$hash} exceeded limit ({$count}/" . self::MAX_REQUESTS . " in " . self::WINDOW_SECONDS . "s).");
+                Nofliq_Logger::info("RateLimiter: IP {$hash} exceeded limit ({$count}/" . self::MAX_REQUESTS . " in " . self::WINDOW_SECONDS . "s).");
             }
 
             self::$cache[$hash] = $allowed;
             return $allowed;
 
         } catch (Exception $e) {
-            Logger::debug('RateLimiter error: ' . $e->getMessage() . ' — failing open.');
+            Nofliq_Logger::debug('RateLimiter error: ' . $e->getMessage() . ' — failing open.');
             return true;
         }
     }
@@ -110,7 +110,7 @@ class RateLimiter {
             $this->redis->connect(self::REDIS_HOST, self::REDIS_PORT, self::REDIS_TIMEOUT);
             $this->redis->select(self::REDIS_DB);
         } catch (Exception $e) {
-            Logger::error('RateLimiter connection failed: ' . $e->getMessage());
+            Nofliq_Logger::error('RateLimiter connection failed: ' . $e->getMessage());
             $this->available = false;
             $this->redis     = null;
         }

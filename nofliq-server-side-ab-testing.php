@@ -76,7 +76,7 @@ add_action('plugins_loaded', function (): void {
         // then Reporting, then Settings. Keep Settings last by convention.
         new ExperimentsPage();
         new ReportingPage();
-        new Settings();
+        new Nofliq_Settings();
     }
 });
 
@@ -137,7 +137,7 @@ function abtf_enqueue_scripts(): void
         'visitorIdJsPath'   => VisitorIdProvider::getJsPath(),
         // Gates frontend console output behind the same ABTF_LOG_LEVEL switch
         // that controls PHP logging. True only when the level includes debug.
-        'debug'             => Logger::isDebug(),
+        'debug'             => Nofliq_Logger::isDebug(),
     ]);
 
     // Expose the AB test decision for this page as inline JS attached to the
@@ -220,7 +220,7 @@ function abtf_runner(): ExperimentRunner
 
 function abtf_init(): void
 {
-    $database = new Database();
+    $database = new Nofliq_Database();
     $database->maybeCreateTable();
 
 }

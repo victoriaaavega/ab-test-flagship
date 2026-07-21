@@ -24,11 +24,11 @@ if (!defined('ABSPATH')) {
  */
 class IdentifyEndpoint
 {
-    private RateLimiter $rateLimiter;
+    private Nofliq_RateLimiter $rateLimiter;
 
     public function __construct()
     {
-        $this->rateLimiter = new RateLimiter();
+        $this->rateLimiter = new Nofliq_RateLimiter();
         add_action('rest_api_init', [$this, 'registerRoute']);
     }
 
@@ -133,8 +133,8 @@ class IdentifyEndpoint
             return new WP_REST_Response(['success' => true, 'copied' => 0], 200);
         }
 
-        $database = new Database();
-        $redis    = new RedisClient();
+        $database = new Nofliq_Database();
+        $redis    = new Nofliq_RedisClient();
         $copied   = 0;
         $redisUp  = $redis->isAvailable();
 

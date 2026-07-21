@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
  * Also manages the Visitor ID Provider configuration, which determines
  * how the plugin resolves a persistent visitor ID across page loads.
  */
-class Settings
+class Nofliq_Settings
 {
 
     private const MENU_SLUG = 'abtf-settings';

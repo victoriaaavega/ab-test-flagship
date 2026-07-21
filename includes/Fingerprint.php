@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
  * result the returned ID is NOT always a 64-char hex string anymore — heap
  * returns Heap's own format (e.g. a 16-digit numeric userId).
  */
-class Fingerprint
+class Nofliq_Fingerprint
 {
     /**
      * Returns the visitor ID based on the active provider configuration.

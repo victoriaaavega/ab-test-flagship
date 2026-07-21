@@ -41,7 +41,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
         $apiKey = CredentialsManager::getApiKey();
 
         if ($envId === null || $apiKey === null) {
-            Logger::error('FlagshipAdapter: credentials not found.');
+            Nofliq_Logger::error('FlagshipAdapter: credentials not found.');
             return;
         }
 
@@ -71,7 +71,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
     public function decide(string $visitorId, string $experimentId): array
     {
         if (!CredentialsManager::hasCredentials()) {
-            Logger::error('FlagshipAdapter: no credentials, serving control.');
+            Nofliq_Logger::error('FlagshipAdapter: no credentials, serving control.');
             return $this->controlResult();
         }
 
@@ -84,7 +84,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
             $flag = $visitor->getFlag($experimentId);
 
             if (!$flag->exists()) {
-                Logger::error("Flag '{$experimentId}' not found in Flagship. Serving control.");
+                Nofliq_Logger::error("Flag '{$experimentId}' not found in Flagship. Serving control.");
                 return $this->controlResult();
             }
 
@@ -99,7 +99,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
             $variationGroupId = $metadata->getVariationGroupId() ?: null;
             $variationId      = $metadata->getVariationId() ?: null;
 
-            Logger::debug("Flagship decision for '{$experimentId}': {$value} (vg: {$variationGroupId}, v: {$variationId})");
+            Nofliq_Logger::debug("Flagship decision for '{$experimentId}': {$value} (vg: {$variationGroupId}, v: {$variationId})");
 
             return [
                 'variant'          => $value,
@@ -107,7 +107,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
                 'variationId'      => $variationId,
             ];
         } catch (\Exception $e) {
-            Logger::error('Flagship error: ' . $e->getMessage() . '. Serving control.');
+            Nofliq_Logger::error('Flagship error: ' . $e->getMessage() . '. Serving control.');
             return $this->controlResult();
         }
     }

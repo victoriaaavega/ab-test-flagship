@@ -92,7 +92,7 @@ class AutoInjector {
         // wp_json_encode returns false on failure; guard so we never emit
         // 'window.abTestData = false;'.
         if ($dataJson === false || $configJson === false) {
-            Logger::error('AutoInjector: failed to JSON-encode AB test data. Nothing injected.');
+            Nofliq_Logger::error('AutoInjector: failed to JSON-encode AB test data. Nothing injected.');
             return '';
         }
 

@@ -20,9 +20,9 @@ if (!defined('ABSPATH')) {
  */
 class ExperimentRunner {
 
-    private Fingerprint $fingerprint;
-    private RedisClient $redis;
-    private Database $database;
+    private Nofliq_Fingerprint $fingerprint;
+    private Nofliq_RedisClient $redis;
+    private Nofliq_Database $database;
     private DecisionAdapterInterface $adapter;
     private FlagshipActivator $activator;
 
@@ -40,9 +40,9 @@ class ExperimentRunner {
     private static bool $bootstrapped = false;
 
     public function __construct(DecisionAdapterInterface $adapter) {
-        $this->fingerprint = new Fingerprint();
-        $this->redis       = new RedisClient();
-        $this->database    = new Database();
+        $this->fingerprint = new Nofliq_Fingerprint();
+        $this->redis       = new Nofliq_RedisClient();
+        $this->database    = new Nofliq_Database();
         $this->adapter     = $adapter;
         $this->activator   = new FlagshipActivator();
     }
@@ -64,7 +64,7 @@ class ExperimentRunner {
         if ($this->redis->isAvailable()) {
             $result = $this->handleWithRedis($experimentId, $visitorId);
         } else {
-            Logger::debug("Redis unavailable, falling back to database. Experiment: {$experimentId}");
+            Nofliq_Logger::debug("Redis unavailable, falling back to database. Experiment: {$experimentId}");
             $result = $this->handleWithDatabase($experimentId, $visitorId);
         }
 
@@ -92,7 +92,7 @@ class ExperimentRunner {
         $stored = $this->redis->getAssignment($experimentId, $visitorId);
 
         if ($stored !== null) {
-            Logger::debug("Returning visitor from Redis. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$stored['variant']}");
+            Nofliq_Logger::debug("Returning visitor from Redis. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$stored['variant']}");
             return $this->buildResult($experimentId, $visitorId, $stored['variant'], 'redis', $stored['variationGroupId'], $stored['variationId']);
         }
 
@@ -101,7 +101,7 @@ class ExperimentRunner {
         $this->redis->saveAssignment($experimentId, $visitorId, $decision['variant'], $decision['variationGroupId'], $decision['variationId']);
         $this->database->saveVariant($experimentId, $visitorId, $decision['variant']);
 
-        Logger::debug("New visitor assigned. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
+        Nofliq_Logger::debug("New visitor assigned. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
         return $this->buildResult($experimentId, $visitorId, $decision['variant'], 'redis', $decision['variationGroupId'], $decision['variationId']);
     }
 
@@ -115,7 +115,7 @@ class ExperimentRunner {
         $variant = $this->database->getVariant($experimentId, $visitorId);
 
         if ($variant !== null) {
-            Logger::debug("Returning visitor from database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
+            Nofliq_Logger::debug("Returning visitor from database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$variant}");
             return $this->buildResult($experimentId, $visitorId, $variant, 'database', null, null);
         }
 
@@ -123,7 +123,7 @@ class ExperimentRunner {
 
         $this->database->saveVariant($experimentId, $visitorId, $decision['variant']);
 
-        Logger::debug("New visitor assigned to database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
+        Nofliq_Logger::debug("New visitor assigned to database. Experiment: {$experimentId}, Visitor: {$visitorId}, Variant: {$decision['variant']}");
         return $this->buildResult($experimentId, $visitorId, $decision['variant'], 'database', $decision['variationGroupId'], $decision['variationId']);
     }
 

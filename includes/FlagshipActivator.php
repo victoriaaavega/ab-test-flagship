@@ -36,7 +36,7 @@ class FlagshipActivator
         $envId = CredentialsManager::getEnvId();
 
         if ($envId === null) {
-            Logger::error('FlagshipActivator: no credentials, activate skipped.');
+            Nofliq_Logger::error('FlagshipActivator: no credentials, activate skipped.');
             return false;
         }
 
@@ -53,7 +53,7 @@ class FlagshipActivator
         // array of strings should always encode, but a false body would send
         // an empty activate that Flagship cannot attribute.
         if ($body === false) {
-            Logger::error('FlagshipActivator: failed to JSON-encode the activate payload. Activate not sent.');
+            Nofliq_Logger::error('FlagshipActivator: failed to JSON-encode the activate payload. Activate not sent.');
             return false;
         }
 
@@ -64,7 +64,7 @@ class FlagshipActivator
         ]);
 
         if (is_wp_error($response)) {
-            Logger::error('FlagshipActivator failed (wp_error): ' . $response->get_error_message());
+            Nofliq_Logger::error('FlagshipActivator failed (wp_error): ' . $response->get_error_message());
             return false;
         }
 
@@ -73,11 +73,11 @@ class FlagshipActivator
         // The activate endpoint returns 204 No Content on success.
         if ($statusCode < 200 || $statusCode >= 300) {
             $body = wp_remote_retrieve_body($response);
-            Logger::error("FlagshipActivator failed. Status: {$statusCode}, Body: {$body}");
+            Nofliq_Logger::error("FlagshipActivator failed. Status: {$statusCode}, Body: {$body}");
             return false;
         }
 
-        Logger::debug("Visitor activated. Visitor: {$visitorId}, caid: {$variationGroupId}, vaid: {$variationId}");
+        Nofliq_Logger::debug("Visitor activated. Visitor: {$visitorId}, caid: {$variationGroupId}, vaid: {$variationId}");
 
         return true;
     }

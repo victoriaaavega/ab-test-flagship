@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
  * has access to wp-config.php they already have everything. The goal is to ensure
  * credentials are never stored in plain text in the database.
  */
-class Encryption {
+class Nofliq_Encryption {
 
     private const CIPHER    = 'AES-256-CBC';
     private const IV_LENGTH = 16;

@@ -54,8 +54,8 @@ class CredentialsManager {
      * @return bool
      */
     public static function save(string $envId, string $apiKey): bool {
-        $encryptedEnvId  = Encryption::encrypt($envId);
-        $encryptedApiKey = Encryption::encrypt($apiKey);
+        $encryptedEnvId  = Nofliq_Encryption::encrypt($envId);
+        $encryptedApiKey = Nofliq_Encryption::encrypt($apiKey);
 
         if ($encryptedEnvId === null || $encryptedApiKey === null) {
             return false;
@@ -99,8 +99,8 @@ class CredentialsManager {
     $encryptedApiKey = get_option(self::OPTION_API_KEY, '');
 
     if ($encryptedEnvId !== '' && $encryptedApiKey !== '') {
-        $envId  = Encryption::decrypt($encryptedEnvId);
-        $apiKey = Encryption::decrypt($encryptedApiKey);
+        $envId  = Nofliq_Encryption::decrypt($encryptedEnvId);
+        $apiKey = Nofliq_Encryption::decrypt($encryptedApiKey);
 
         if ($envId !== null && $apiKey !== null) {
             self::$envId  = $envId;
