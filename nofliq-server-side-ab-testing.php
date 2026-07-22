@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Nofliq Server-Side A/B Testing
  * Description: No-flicker server-side A/B testing. Integrates with AB Tasty Flagship.
- * Version: 1.8.0
+ * Version: 1.9.0
  * Author: Victoria Vega
  * Requires at least: 6.5
  * Requires PHP: 8.1
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('NOFLIQ_VERSION', '1.8.0');
+define('NOFLIQ_VERSION', '1.9.0');
 define('NOFLIQ_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('NOFLIQ_PLUGIN_URL', plugin_dir_url(__FILE__));
 

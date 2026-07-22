@@ -53,6 +53,22 @@ class Nofliq_Fingerprint
     }
 
     /**
+     * Recomputes the raw fingerprint for the current request (SHA-256 of
+     * IP + User-Agent + Accept-Language), regardless of the active provider.
+     *
+     * Used by IdentifyEndpoint to verify that the caller is the visitor whose
+     * fingerprint they claim: the server recomputes the fingerprint from this
+     * very request and compares. A caller cannot present a fingerprint that
+     * isn't the one their own request produces.
+     *
+     * @return string 64-char SHA256 hex string
+     */
+    public function computeFingerprintId(): string
+    {
+        return $this->generateFingerprint();
+    }
+
+    /**
      * Reads and validates the external visitor ID from the abtf_visitor_id cookie.
      * Returns null if the cookie is absent or empty.
      *

@@ -105,6 +105,21 @@ class IdentifyEndpoint
         $fingerprintVisitorId = $request->get_param('fingerprint_visitor_id');
         $externalVisitorId    = $request->get_param('external_visitor_id');
 
+        // Ownership check: the caller may only reconcile the fingerprint that
+        // THIS request actually produces. The server recomputes the fingerprint
+        // from the current request (IP + UA + Accept-Language) and compares. A
+        // caller cannot copy assignments from an arbitrary visitor ID they do
+        // not own, because they cannot reproduce someone else's fingerprint.
+        $expectedFingerprint = (new Nofliq_Fingerprint())->computeFingerprintId();
+
+        if (!hash_equals($expectedFingerprint, (string) $fingerprintVisitorId)) {
+            error_log('[AB Test] IdentifyEndpoint: fingerprint mismatch, reconciliation refused.');
+            return new WP_REST_Response(
+                ['success' => false, 'error' => 'fingerprint_mismatch'],
+                403
+            );
+        }
+
         // Build the destination visitor ID exactly the way Fingerprint.php does
         // on the next page load, so the reconciliation writes to the same key
         // the lookup will later read from. Heap/custom use the raw ID; only

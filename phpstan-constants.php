@@ -31,7 +31,7 @@ if (!defined('ARRAY_A')) {
 // Plugin constants (defined in the main plugin file, which is out of scope for
 // the classes in includes/). Declared here so static analysis can resolve them.
 if (!defined('NOFLIQ_VERSION')) {
-    define('NOFLIQ_VERSION', '1.8.0');
+    define('NOFLIQ_VERSION', '1.9.0');
 }
 
 if (!defined('NOFLIQ_PLUGIN_URL')) {

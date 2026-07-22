@@ -11,9 +11,6 @@
         "flagship-io/flagship-php-sdk": "^4.2"
     },
     "autoload": {
-        "psr-4": {
-            "ABTF\\": "includes/"
-        },
         "classmap": [
             "includes/"
         ]
