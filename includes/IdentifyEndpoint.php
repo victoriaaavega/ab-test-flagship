@@ -37,7 +37,15 @@ class IdentifyEndpoint
         register_rest_route('abtest/v1', '/identify', [
             'methods'             => 'POST',
             'callback'            => [$this, 'handleRequest'],
-            'permission_callback' => [$this, 'validateRequest'],
+            // Intentionally public endpoint: identity reconciliation runs on an
+            // anonymous visitor's first page load, so there is no logged-in user
+            // to authorize. Per WordPress guidelines this is __return_true, with
+            // ownership enforced inside the handler: handleRequest() recomputes
+            // the request's fingerprint and refuses (403) unless it matches the
+            // submitted fingerprint_visitor_id — so a caller can only reconcile
+            // an identity they actually own. Nonce + rate limit run there too as
+            // defense-in-depth. See handleRequest().
+            'permission_callback' => '__return_true',
             'args'                => [
                 'fingerprint_visitor_id' => [
                     'required'          => true,
@@ -61,12 +69,17 @@ class IdentifyEndpoint
     }
 
     /**
-     * Validates nonce and rate limit — same security pattern as EventEndpoint.
+     * Defense-in-depth guard, run at the start of the handler (NOT as a
+     * permission_callback). This is a public endpoint (see registerRoute), so
+     * these checks are not authorization — the real ownership check lives in
+     * handleRequest() via fingerprint recomputation. Here we only apply abuse
+     * mitigation: a front-end nonce plus a per-IP rate limit. Returns a
+     * WP_Error to short-circuit the handler, or true.
      *
      * @param WP_REST_Request $request
      * @return bool|WP_Error
      */
-    public function validateRequest(WP_REST_Request $request): bool|WP_Error
+    private function checkRequestGuard(WP_REST_Request $request): bool|WP_Error
     {
         $nonce = $request->get_header('X-ABTF-Nonce');
 
@@ -91,6 +104,10 @@ class IdentifyEndpoint
      * Copies all variant assignments from the fingerprint visitor ID to the
      * external visitor ID in both the database and Redis.
      *
+     * Runs the defense-in-depth guard FIRST (nonce + rate limit), then the
+     * ownership check (fingerprint recomputation). Because this is a public
+     * endpoint, both live here rather than in a permission_callback.
+     *
      * The external visitor ID is hashed with the active provider prefix so it
      * matches exactly what Fingerprint::generateVisitorId() produces on the
      * next page load.
@@ -101,6 +118,18 @@ class IdentifyEndpoint
     public function handleRequest(WP_REST_Request $request): WP_REST_Response
     {
         global $wpdb;
+
+        // Defense-in-depth guard (nonce + rate limit). Returned as a
+        // WP_REST_Response with the guard's status, matching this handler's
+        // existing convention (the fingerprint-mismatch 403 below is also a
+        // WP_REST_Response rather than a WP_Error).
+        $guard = $this->checkRequestGuard($request);
+        if (is_wp_error($guard)) {
+            return new WP_REST_Response(
+                ['success' => false, 'error' => $guard->get_error_code()],
+                (int) ($guard->get_error_data()['status'] ?? 400)
+            );
+        }
 
         $fingerprintVisitorId = $request->get_param('fingerprint_visitor_id');
         $externalVisitorId    = $request->get_param('external_visitor_id');

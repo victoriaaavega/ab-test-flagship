@@ -41,7 +41,12 @@ class EventEndpoint
         register_rest_route('abtest/v1', '/event', [
             'methods'             => 'POST',
             'callback'            => [$this, 'handleEvent'],
-            'permission_callback' => [$this, 'validateRequest'],
+            // Intentionally public endpoint: anonymous visitors fire conversion
+            // events, so there is no logged-in user to authorize. Per WordPress
+            // guidelines, a public endpoint uses __return_true here and applies
+            // its defenses (nonce + rate limit) inside the handler as
+            // defense-in-depth, not as authorization. See handleEvent().
+            'permission_callback' => '__return_true',
             'args'                => [
                 'visitor_id' => [
                     'required'          => true,
@@ -85,13 +90,16 @@ class EventEndpoint
     }
 
     /**
-     * Validates that the request comes from the site using a WordPress nonce,
-     * and that the client IP has not exceeded the rate limit.
+     * Defense-in-depth guard, run at the start of the handler (NOT as a
+     * permission_callback). This is a public endpoint (see registerRoute), so
+     * these checks are not authorization — they are abuse mitigation: a
+     * front-end nonce to discourage trivial off-site forgery, plus a per-IP
+     * rate limit. Returns a WP_Error to short-circuit the handler, or true.
      *
      * @param WP_REST_Request $request
      * @return bool|WP_Error
      */
-    public function validateRequest(WP_REST_Request $request): bool|WP_Error
+    private function checkRequestGuard(WP_REST_Request $request): bool|WP_Error
     {
         $nonce = $request->get_header('X-ABTF-Nonce');
 
@@ -115,17 +123,27 @@ class EventEndpoint
     /**
      * Handles incoming event requests.
      *
-     * The internal conversion is recorded FIRST and independently of Flagship.
-     * That recording is the endpoint's real contract — it is what the live
-     * Reporting dashboard reads. The hit to Flagship is a best-effort secondary
-     * delivery: its outcome is reported in the 'flagship' field but never
-     * suppresses a conversion that the user genuinely made.
+     * Runs the defense-in-depth guard FIRST (nonce + rate limit). Because this
+     * is a public endpoint, the guard lives here rather than in a
+     * permission_callback: a failed check returns a WP_Error so WordPress
+     * emits the correct 401/403/429 status before any work is done.
+     *
+     * The internal conversion is then recorded FIRST and independently of
+     * Flagship. That recording is the endpoint's real contract — it is what the
+     * live Reporting dashboard reads. The hit to Flagship is a best-effort
+     * secondary delivery: its outcome is reported in the 'flagship' field but
+     * never suppresses a conversion that the user genuinely made.
      *
      * @param WP_REST_Request $request
-     * @return WP_REST_Response
+     * @return WP_REST_Response|WP_Error
      */
-    public function handleEvent(WP_REST_Request $request): WP_REST_Response
+    public function handleEvent(WP_REST_Request $request): WP_REST_Response|WP_Error
     {
+        $guard = $this->checkRequestGuard($request);
+        if (is_wp_error($guard)) {
+            return $guard;
+        }
+
         $visitorId    = $request->get_param('visitor_id');
         $experimentId = $request->get_param('experiment_id');
         $eventName    = $request->get_param('event_name');
