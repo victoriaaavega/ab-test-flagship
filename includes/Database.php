@@ -84,7 +84,7 @@ class Nofliq_Database
         );
 
         if ($result === false) {
-            error_log('[AB Test] Database saveVariant error: ' . ($wpdb->last_error ?: 'unknown'));
+            Nofliq_Logger::error('Database saveVariant error: ' . ($wpdb->last_error ?: 'unknown'));
             return false;
         }
 
@@ -127,7 +127,7 @@ class Nofliq_Database
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
-        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+        Nofliq_Logger::debug('Table ' . $tableName . ' checked/created.');
     }
 
     /**
@@ -165,7 +165,7 @@ class Nofliq_Database
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
-        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+        Nofliq_Logger::debug('Table ' . $tableName . ' checked/created.');
     }
 
     /**
@@ -192,7 +192,7 @@ class Nofliq_Database
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
-        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+        Nofliq_Logger::debug('Table ' . $tableName . ' checked/created.');
     }
 
     /**
@@ -233,7 +233,7 @@ class Nofliq_Database
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
-        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+        Nofliq_Logger::debug('Table ' . $tableName . ' checked/created.');
     }
 
     /**
@@ -270,6 +270,6 @@ class Nofliq_Database
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
-        error_log('[AB Test] Table ' . $tableName . ' checked/created.');
+        Nofliq_Logger::debug('Table ' . $tableName . ' checked/created.');
     }
 }

@@ -108,7 +108,7 @@ class Nofliq_CredentialsManager {
             return;
         }
 
-        error_log('[AB Test] CredentialsManager: decryption failed. Credentials may be corrupted.');
+        Nofliq_Logger::error('CredentialsManager: decryption failed. Credentials may be corrupted.');
     }
 
     self::$envId  = null;

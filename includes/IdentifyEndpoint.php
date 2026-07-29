@@ -142,7 +142,7 @@ class Nofliq_IdentifyEndpoint
         $expectedFingerprint = (new Nofliq_Fingerprint())->computeFingerprintId();
 
         if (!hash_equals($expectedFingerprint, (string) $fingerprintVisitorId)) {
-            error_log('[AB Test] IdentifyEndpoint: fingerprint mismatch, reconciliation refused.');
+            Nofliq_Logger::error('IdentifyEndpoint: fingerprint mismatch, reconciliation refused.');
             return new WP_REST_Response(
                 ['success' => false, 'error' => 'fingerprint_mismatch'],
                 403
@@ -173,7 +173,7 @@ class Nofliq_IdentifyEndpoint
         );
 
         if (empty($assignments)) {
-            error_log("[AB Test] IdentifyEndpoint: no assignments found for fingerprint {$fingerprintVisitorId}.");
+            Nofliq_Logger::debug("IdentifyEndpoint: no assignments found for fingerprint {$fingerprintVisitorId}.");
             return new WP_REST_Response(['success' => true, 'copied' => 0], 200);
         }
 
@@ -206,7 +206,7 @@ class Nofliq_IdentifyEndpoint
             $copied++;
         }
 
-        error_log("[AB Test] IdentifyEndpoint: copied {$copied} assignment(s) from fingerprint {$fingerprintVisitorId} to external visitor {$destinationVisitorId}.");
+        Nofliq_Logger::debug("IdentifyEndpoint: copied {$copied} assignment(s) from fingerprint {$fingerprintVisitorId} to external visitor {$destinationVisitorId}.");
 
         return new WP_REST_Response(['success' => true, 'copied' => $copied], 200);
     }

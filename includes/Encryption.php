@@ -30,7 +30,7 @@ class Nofliq_Encryption {
         $key = self::deriveKey();
 
         if ($key === null) {
-            error_log('[AB Test] Encryption: AUTH_KEY or AUTH_SALT not defined.');
+            Nofliq_Logger::error('Encryption: AUTH_KEY or AUTH_SALT not defined.');
             return null;
         }
 
@@ -38,7 +38,7 @@ class Nofliq_Encryption {
         $ciphertext = openssl_encrypt($value, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv);
 
         if ($ciphertext === false) {
-            error_log('[AB Test] Encryption: openssl_encrypt failed.');
+            Nofliq_Logger::error('Encryption: openssl_encrypt failed.');
             return null;
         }
 
@@ -55,14 +55,14 @@ class Nofliq_Encryption {
         $key = self::deriveKey();
 
         if ($key === null) {
-            error_log('[AB Test] Encryption: AUTH_KEY or AUTH_SALT not defined.');
+            Nofliq_Logger::error('Encryption: AUTH_KEY or AUTH_SALT not defined.');
             return null;
         }
 
         $decoded = base64_decode($encrypted, strict: true);
 
         if ($decoded === false || strlen($decoded) <= self::IV_LENGTH) {
-            error_log('[AB Test] Encryption: invalid encrypted payload.');
+            Nofliq_Logger::error('Encryption: invalid encrypted payload.');
             return null;
         }
 
@@ -72,7 +72,7 @@ class Nofliq_Encryption {
         $plain = openssl_decrypt($ciphertext, self::CIPHER, $key, OPENSSL_RAW_DATA, $iv);
 
         if ($plain === false) {
-            error_log('[AB Test] Encryption: openssl_decrypt failed.');
+            Nofliq_Logger::error('Encryption: openssl_decrypt failed.');
             return null;
         }
 

@@ -42,7 +42,7 @@ class Nofliq_RedisClient {
             $pong = $redis->ping();
             return $pong === true || $pong === '+PONG';
         } catch (Exception $e) {
-            error_log('[AB Test] Redis ping failed: ' . $e->getMessage());
+            Nofliq_Logger::error('Redis ping failed: ' . $e->getMessage());
             // Keep state coherent: a failed connection means no usable instance.
             // Otherwise $instance would linger pointing at a dead socket while
             // $failed says there is no connection — a contradiction that a
@@ -90,7 +90,7 @@ class Nofliq_RedisClient {
                 'variationId'      => $decoded['variationId'] ?? null,
             ];
         } catch (Exception $e) {
-            error_log('[AB Test] Redis getAssignment error: ' . $e->getMessage());
+            Nofliq_Logger::error('Redis getAssignment error: ' . $e->getMessage());
             return null;
         }
     }
@@ -120,7 +120,7 @@ class Nofliq_RedisClient {
             ]);
             return $redis->setex($key, self::VARIANT_TTL, $payload);
         } catch (Exception $e) {
-            error_log('[AB Test] Redis saveAssignment error: ' . $e->getMessage());
+            Nofliq_Logger::error('Redis saveAssignment error: ' . $e->getMessage());
             return false;
         }
     }
@@ -146,7 +146,7 @@ class Nofliq_RedisClient {
             $set = $redis->set($key, '1', ['NX', 'EX' => self::ACTIVATED_TTL]);
             return $set === true;
         } catch (Exception $e) {
-            error_log('[AB Test] Redis markActivatedIfFirst error: ' . $e->getMessage());
+            Nofliq_Logger::error('Redis markActivatedIfFirst error: ' . $e->getMessage());
             return true; // Fail open — better a possible duplicate than a missed activate.
         }
     }
@@ -188,7 +188,7 @@ class Nofliq_RedisClient {
             self::$instance = $redis;
             return self::$instance;
         } catch (Exception $e) {
-            error_log('[AB Test] Redis connection failed: ' . $e->getMessage());
+            Nofliq_Logger::error('Redis connection failed: ' . $e->getMessage());
             self::$failed = true;
             return null;
         }

@@ -82,7 +82,7 @@ class Nofliq_ConversionTracker
 
             return true;
         } catch (Exception $e) {
-            error_log('[AB Test] ConversionTracker record error: ' . $e->getMessage());
+            Nofliq_Logger::error('ConversionTracker record error: ' . $e->getMessage());
             return false;
         }
     }
@@ -122,7 +122,7 @@ class Nofliq_ConversionTracker
         );
 
         if ($result === false) {
-            error_log('[AB Test] ConversionTracker recordLocal error: ' . ($wpdb->last_error ?: 'unknown'));
+            Nofliq_Logger::error('ConversionTracker recordLocal error: ' . ($wpdb->last_error ?: 'unknown'));
             return false;
         }
 
@@ -158,7 +158,7 @@ class Nofliq_ConversionTracker
             $value = $redis->get($key);
             return $value !== false ? (int) $value : 0;
         } catch (Exception $e) {
-            error_log('[AB Test] ConversionTracker getTotal error: ' . $e->getMessage());
+            Nofliq_Logger::error('ConversionTracker getTotal error: ' . $e->getMessage());
             return 0;
         }
     }
@@ -180,7 +180,7 @@ class Nofliq_ConversionTracker
             $key = $this->buildKey(self::UNIQUE_PREFIX, $experimentId, $variant, $eventName);
             return (int) $redis->pfCount($key);
         } catch (Exception $e) {
-            error_log('[AB Test] ConversionTracker getUnique error: ' . $e->getMessage());
+            Nofliq_Logger::error('ConversionTracker getUnique error: ' . $e->getMessage());
             return 0;
         }
     }
@@ -273,7 +273,7 @@ class Nofliq_ConversionTracker
 
             return $rows;
         } catch (Exception $e) {
-            error_log('[AB Test] ConversionTracker listAll error: ' . $e->getMessage());
+            Nofliq_Logger::error('ConversionTracker listAll error: ' . $e->getMessage());
             return [];
         }
     }
@@ -343,7 +343,7 @@ class Nofliq_ConversionTracker
             self::$instance = $redis;
             return self::$instance;
         } catch (Exception $e) {
-            error_log('[AB Test] ConversionTracker connection failed: ' . $e->getMessage());
+            Nofliq_Logger::error('ConversionTracker connection failed: ' . $e->getMessage());
             self::$failed = true;
             return null;
         }

@@ -35,7 +35,7 @@ class Nofliq_HitCacheRedis implements IHitCacheImplementation {
             $this->redis->connect(self::REDIS_HOST, self::REDIS_PORT, self::REDIS_TIMEOUT);
             $this->redis->select(self::REDIS_DB);
         } catch (Exception $e) {
-            error_log('[AB Test] HitCacheRedis connection failed: ' . $e->getMessage());
+            Nofliq_Logger::error('HitCacheRedis connection failed: ' . $e->getMessage());
             $this->available = false;
             $this->redis     = null;
         }
@@ -59,7 +59,7 @@ class Nofliq_HitCacheRedis implements IHitCacheImplementation {
             }
             $pipeline->exec();
         } catch (Exception $e) {
-            error_log('[AB Test] HitCacheRedis cacheHit error: ' . $e->getMessage());
+            Nofliq_Logger::error('HitCacheRedis cacheHit error: ' . $e->getMessage());
         }
     }
 
@@ -106,7 +106,7 @@ class Nofliq_HitCacheRedis implements IHitCacheImplementation {
 
             return $hitsOut;
         } catch (Exception $e) {
-            error_log('[AB Test] HitCacheRedis lookupHits error: ' . $e->getMessage());
+            Nofliq_Logger::error('HitCacheRedis lookupHits error: ' . $e->getMessage());
             return [];
         }
     }
@@ -124,7 +124,7 @@ class Nofliq_HitCacheRedis implements IHitCacheImplementation {
         try {
             $this->redis->del($hitKeys);
         } catch (Exception $e) {
-            error_log('[AB Test] HitCacheRedis flushHits error: ' . $e->getMessage());
+            Nofliq_Logger::error('HitCacheRedis flushHits error: ' . $e->getMessage());
         }
     }
 
@@ -139,7 +139,7 @@ class Nofliq_HitCacheRedis implements IHitCacheImplementation {
         try {
             $this->redis->flushDB();
         } catch (Exception $e) {
-            error_log('[AB Test] HitCacheRedis flushAllHits error: ' . $e->getMessage());
+            Nofliq_Logger::error('HitCacheRedis flushAllHits error: ' . $e->getMessage());
         }
     }
 }

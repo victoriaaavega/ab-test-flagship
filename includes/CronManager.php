@@ -34,7 +34,7 @@ class Nofliq_CronManager
     {
         if (!wp_next_scheduled(self::HOOK)) {
             wp_schedule_event(time(), self::INTERVAL, self::HOOK);
-            error_log('[AB Test] CronManager: abtf_rebuild_stats scheduled.');
+            Nofliq_Logger::info('CronManager: abtf_rebuild_stats scheduled.');
         }
     }
 
@@ -43,7 +43,7 @@ class Nofliq_CronManager
      */
     public function runRebuild(): void
     {
-        error_log('[AB Test] CronManager: starting scheduled stats rebuild.');
+        Nofliq_Logger::info('CronManager: starting scheduled stats rebuild.');
         Nofliq_StatsRebuildJob::run();
     }
 
@@ -55,7 +55,7 @@ class Nofliq_CronManager
         $timestamp = wp_next_scheduled(self::HOOK);
         if ($timestamp) {
             wp_unschedule_event($timestamp, self::HOOK);
-            error_log('[AB Test] CronManager: abtf_rebuild_stats unscheduled.');
+            Nofliq_Logger::info('CronManager: abtf_rebuild_stats unscheduled.');
         }
     }
 }

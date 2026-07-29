@@ -90,6 +90,11 @@ class Nofliq_Logger
         $levelValue = self::LEVELS[$level] ?? 0;
 
         if ($levelValue <= self::$threshold) {
+            // This is the plugin's single, intentional logging sink. All plugin
+            // code routes through Nofliq_Logger rather than calling error_log()
+            // directly, so this one guarded call is the only error_log() in the
+            // codebase. It is gated by ABTF_LOG_LEVEL (default 'error').
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
             error_log('[AB Test] ' . $message);
         }
     }
