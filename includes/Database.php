@@ -19,7 +19,7 @@ class Nofliq_Database
      */
     public function maybeCreateTable(): void
     {
-        if (get_option('ab_test_table_version') === self::TABLE_VERSION) {
+        if (get_option('nofliq_ab_test_table_version') === self::TABLE_VERSION) {
             return;
         }
 
@@ -29,7 +29,7 @@ class Nofliq_Database
         $this->createConversionsStatsTable();
         $this->createConversionsLocalTable();
 
-        update_option('ab_test_table_version', self::TABLE_VERSION);
+        update_option('nofliq_ab_test_table_version', self::TABLE_VERSION);
     }
 
     /**

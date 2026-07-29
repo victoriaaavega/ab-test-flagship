@@ -57,25 +57,25 @@ require_once NOFLIQ_PLUGIN_DIR . 'includes/IdentifyEndpoint.php';
 // -----------------------------------------------------------------------------
 
 add_filter('cron_schedules', function (array $schedules): array {
-    $schedules[CronManager::INTERVAL] = [
+    $schedules[Nofliq_CronManager::INTERVAL] = [
         'interval' => 8 * HOUR_IN_SECONDS,
         'display'  => 'Every 8 hours',
     ];
     return $schedules;
 });
 
-new CronManager();
+new Nofliq_CronManager();
 
 add_action('plugins_loaded', function (): void {
-    new EventEndpoint();
-    new IdentifyEndpoint();
+    new Nofliq_EventEndpoint();
+    new Nofliq_IdentifyEndpoint();
 
     if (is_admin()) {
-        new MetaBox();
+        new Nofliq_MetaBox();
         // Submenu order follows instantiation order: Experiments (parent),
         // then Reporting, then Settings. Keep Settings last by convention.
-        new ExperimentsPage();
-        new ReportingPage();
+        new Nofliq_ExperimentsPage();
+        new Nofliq_ReportingPage();
         new Nofliq_Settings();
     }
 });
@@ -117,7 +117,7 @@ function abtf_enqueue_scripts(): void
 
     // Only enqueue visitor-sync.js when the provider requires JS-side ID resolution.
     // For fingerprint, PHP handles everything and there is nothing to sync.
-    if (VisitorIdProvider::usesExternalId()) {
+    if (Nofliq_VisitorIdProvider::usesExternalId()) {
         wp_enqueue_script(
             'abtf-visitor-sync',
             NOFLIQ_PLUGIN_URL . 'assets/js/visitor-sync.js',
@@ -133,8 +133,8 @@ function abtf_enqueue_scripts(): void
         'nonce'             => abtf_create_public_nonce('abtf_track_event'),
         'cookieDomain'      => abtf_get_cookie_domain(),
         // Passed to visitor-sync.js — null when provider is fingerprint.
-        'visitorIdProvider' => VisitorIdProvider::getProvider(),
-        'visitorIdJsPath'   => VisitorIdProvider::getJsPath(),
+        'visitorIdProvider' => Nofliq_VisitorIdProvider::getProvider(),
+        'visitorIdJsPath'   => Nofliq_VisitorIdProvider::getJsPath(),
         // Gates frontend console output behind the same ABTF_LOG_LEVEL switch
         // that controls PHP logging. True only when the level includes debug.
         'debug'             => Nofliq_Logger::isDebug(),
@@ -144,7 +144,7 @@ function abtf_enqueue_scripts(): void
     // tracker handle, so it is emitted before event-tracker.js runs. Replaces
     // the former raw <script> printed on wp_footer (WordPress.org: no inline
     // <script> tags; use wp_add_inline_script).
-    $injector   = new AutoInjector();
+    $injector   = new Nofliq_AutoInjector();
     $inlineData = $injector->buildInlineData();
 
     if ($inlineData !== '') {
@@ -163,7 +163,7 @@ function abtf_check_credentials(): void
         return;
     }
 
-    if (!CredentialsManager::hasCredentials()) {
+    if (!Nofliq_CredentialsManager::hasCredentials()) {
         add_action('admin_notices', function (): void {
             $settingsUrl = admin_url('admin.php?page=abtf-settings');
             echo '<div class="notice notice-error"><p>';
@@ -196,7 +196,7 @@ function abtf_create_public_nonce(string $action): string
  * Returns the singleton ExperimentRunner, choosing the correct adapter
  * based on whether Flagship credentials are configured.
  */
-function abtf_runner(): ExperimentRunner
+function abtf_runner(): Nofliq_ExperimentRunner
 {
     static $runner = null;
 
@@ -204,11 +204,11 @@ function abtf_runner(): ExperimentRunner
         // The decision engine is chosen by the administrator's explicit mode
         // setting, never inferred from whether credentials happen to exist.
         // Local mode uses the plugin's own engine; Flagship mode uses AB Tasty.
-        $adapter = DecisionMode::isLocal()
-            ? new LocalAdapter()
-            : new FlagshipAdapter();
+        $adapter = Nofliq_DecisionMode::isLocal()
+            ? new Nofliq_LocalAdapter()
+            : new Nofliq_FlagshipAdapter();
 
-        $runner = new ExperimentRunner($adapter);
+        $runner = new Nofliq_ExperimentRunner($adapter);
     }
 
     return $runner;
@@ -231,12 +231,12 @@ add_action('init', 'abtf_init');
 // -----------------------------------------------------------------------------
 
 register_deactivation_hook(__FILE__, function (): void {
-    CronManager::unschedule();
+    Nofliq_CronManager::unschedule();
 });
 
 function abtf_shutdown(): void
 {
-    if (!CredentialsManager::hasCredentials()) {
+    if (!Nofliq_CredentialsManager::hasCredentials()) {
         return;
     }
 

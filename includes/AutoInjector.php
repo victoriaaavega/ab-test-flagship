@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
  * (see abtf_enqueue_scripts) rather than printed as a raw <script> tag, so it
  * follows WordPress' script pipeline and always lands before event-tracker.js.
  */
-class AutoInjector {
+class Nofliq_AutoInjector {
 
     /**
      * Builds the inline JS that exposes the AB test data for the current page,
@@ -27,7 +27,7 @@ class AutoInjector {
         // against AB Tasty. Without them there is nothing to inject and we bail
         // (the admin sees the credentials notice). In Local mode no credentials
         // are needed: the plugin decides variants itself, so injection proceeds.
-        if (DecisionMode::isFlagship() && !CredentialsManager::hasCredentials()) {
+        if (Nofliq_DecisionMode::isFlagship() && !Nofliq_CredentialsManager::hasCredentials()) {
             return '';
         }
 

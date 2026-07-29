@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
  * On managed hosting, configure a real system cron to hit the site every 8 hours:
  *   curl --silent https://example.com/wp-cron.php?doing_wp_cron > /dev/null 2>&1
  */
-class CronManager
+class Nofliq_CronManager
 {
 
     public const HOOK     = 'abtf_rebuild_stats';
@@ -44,7 +44,7 @@ class CronManager
     public function runRebuild(): void
     {
         error_log('[AB Test] CronManager: starting scheduled stats rebuild.');
-        StatsRebuildJob::run();
+        Nofliq_StatsRebuildJob::run();
     }
 
     /**

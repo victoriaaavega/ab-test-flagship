@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
  * decision, so ExperimentRunner skips the activate hit (which is correct —
  * nothing to activate remotely).
  */
-class LocalAdapter implements DecisionAdapterInterface {
+class Nofliq_LocalAdapter implements Nofliq_DecisionAdapterInterface {
 
     /**
      * Per-request cache of an experiment's variant pair, keyed by flag key.

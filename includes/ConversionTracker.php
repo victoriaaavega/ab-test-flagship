@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
  * event endpoint or affects the user. The SQL backup table (populated by
  * StatsRebuildJob) is the persistent fallback when Redis is unavailable.
  */
-class ConversionTracker
+class Nofliq_ConversionTracker
 {
     private const REDIS_HOST    = '127.0.0.1';
     private const REDIS_PORT    = 6379;
@@ -61,7 +61,7 @@ class ConversionTracker
         // stays consistent: one storage path, Redis-independent, no orphaned
         // rows when Redis comes back. Redis DB 3 is used for conversions only
         // in Flagship mode.
-        if (DecisionMode::isLocal()) {
+        if (Nofliq_DecisionMode::isLocal()) {
             return $this->recordLocal($experimentId, $variant, $eventName, $visitorId);
         }
 

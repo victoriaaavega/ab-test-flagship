@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
  * Contract that any decision engine must fulfill.
  * Decouples ExperimentRunner from any specific implementation.
  */
-interface DecisionAdapterInterface {
+interface Nofliq_DecisionAdapterInterface {
 
     /**
      * Decides which variant a visitor should see for a specific experiment.

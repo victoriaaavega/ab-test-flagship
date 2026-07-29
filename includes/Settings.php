@@ -94,7 +94,7 @@ class Nofliq_Settings
             $this->redirect('invalid_fields', 'error');
         }
 
-        $ok = CredentialsManager::save($envId, $apiKey);
+        $ok = Nofliq_CredentialsManager::save($envId, $apiKey);
 
         $this->redirect($ok ? 'saved' : 'encrypt_error', $ok ? 'success' : 'error');
     }
@@ -103,7 +103,7 @@ class Nofliq_Settings
     {
         check_admin_referer('abtf_delete_settings');
 
-        CredentialsManager::delete();
+        Nofliq_CredentialsManager::delete();
 
         $this->redirect('deleted', 'success');
     }
@@ -115,15 +115,15 @@ class Nofliq_Settings
         $provider = sanitize_key($_POST['visitor_id_provider'] ?? '');
         $jsPath   = sanitize_text_field(wp_unslash($_POST['visitor_id_js_path'] ?? ''));
 
-        if (!in_array($provider, VisitorIdProvider::VALID_PROVIDERS, true)) {
+        if (!in_array($provider, Nofliq_VisitorIdProvider::VALID_PROVIDERS, true)) {
             $this->redirect('provider_invalid', 'error');
         }
 
-        if ($provider === VisitorIdProvider::PROVIDER_CUSTOM && $jsPath === '') {
+        if ($provider === Nofliq_VisitorIdProvider::PROVIDER_CUSTOM && $jsPath === '') {
             $this->redirect('provider_js_path_required', 'error');
         }
 
-        $ok = VisitorIdProvider::save($provider, $jsPath ?: null);
+        $ok = Nofliq_VisitorIdProvider::save($provider, $jsPath ?: null);
 
         $this->redirect($ok ? 'provider_saved' : 'provider_invalid', $ok ? 'success' : 'error');
     }
@@ -134,7 +134,7 @@ class Nofliq_Settings
 
         $mode = sanitize_key($_POST['decision_engine'] ?? '');
 
-        $ok = DecisionMode::save($mode);
+        $ok = Nofliq_DecisionMode::save($mode);
 
         $this->redirect($ok ? 'mode_saved' : 'mode_invalid', $ok ? 'success' : 'error');
     }
@@ -196,7 +196,7 @@ class Nofliq_Settings
      */
     public function renderLocalModeBanner(): void
     {
-        if (!DecisionMode::isLocal()) {
+        if (!Nofliq_DecisionMode::isLocal()) {
             return;
         }
 
@@ -213,9 +213,9 @@ class Nofliq_Settings
 
     public function renderPage(): void
     {
-        $hasDbCredentials = get_option(CredentialsManager::OPTION_ENV_ID, '') !== '';
-        $currentProvider  = VisitorIdProvider::getProvider();
-        $currentJsPath    = VisitorIdProvider::getJsPath() ?? '';
+        $hasDbCredentials = get_option(Nofliq_CredentialsManager::OPTION_ENV_ID, '') !== '';
+        $currentProvider  = Nofliq_VisitorIdProvider::getProvider();
+        $currentJsPath    = Nofliq_VisitorIdProvider::getJsPath() ?? '';
 ?>
         <div class="wrap">
             <h1>AB Tests — Settings</h1>
@@ -293,7 +293,7 @@ class Nofliq_Settings
             <div style="background: #fff; padding: 24px; border: 1px solid #ccd0d4; border-radius: 4px; max-width: 600px; margin-top: 16px;">
                 <h2 style="margin-top: 0;">Current Status</h2>
                 <?php
-                $status = CredentialsManager::hasCredentials()
+                $status = Nofliq_CredentialsManager::hasCredentials()
                     ? ['label' => 'Configured', 'color' => '#2e7d32', 'bg' => '#e8f5e9']
                     : ['label' => 'Not configured', 'color' => '#a00', 'bg' => '#fce8e8'];
                 ?>
@@ -312,7 +312,7 @@ class Nofliq_Settings
                     simple experiments without an AB Tasty account.
                 </p>
 
-                <?php $currentMode = DecisionMode::get(); ?>
+                <?php $currentMode = Nofliq_DecisionMode::get(); ?>
 
                 <form method="post" action="">
                     <?php wp_nonce_field('abtf_save_mode'); ?>
@@ -327,7 +327,7 @@ class Nofliq_Settings
                                         <input type="radio"
                                             name="decision_engine"
                                             value="flagship"
-                                            <?php checked($currentMode, DecisionMode::MODE_FLAGSHIP); ?>>
+                                            <?php checked($currentMode, Nofliq_DecisionMode::MODE_FLAGSHIP); ?>>
                                         <strong>Flagship</strong> (recommended)
                                         <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
                                             Variants decided by AB Tasty Flagship. Requires credentials above.
@@ -338,7 +338,7 @@ class Nofliq_Settings
                                         <input type="radio"
                                             name="decision_engine"
                                             value="local"
-                                            <?php checked($currentMode, DecisionMode::MODE_LOCAL); ?>>
+                                            <?php checked($currentMode, Nofliq_DecisionMode::MODE_LOCAL); ?>>
                                         <strong>Local</strong>
                                         <span style="color: #666; font-size: 13px; display: block; margin-left: 22px;">
                                             Variants decided locally, no Flagship call. No data leaves your site.

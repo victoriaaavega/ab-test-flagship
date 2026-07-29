@@ -17,12 +17,12 @@ if (!defined('ABSPATH')) {
  *
  * The destination visitor ID is built the same way Fingerprint.php builds it
  * on the next page load: raw for heap/custom, hashed only for fingerprint
- * (decided by VisitorIdProvider::shouldHash()). This guarantees the copy lands
+ * (decided by Nofliq_VisitorIdProvider::shouldHash()). This guarantees the copy lands
  * on the exact key the next lookup will read from.
  *
  * Endpoint: POST /wp-json/abtest/v1/identify
  */
-class IdentifyEndpoint
+class Nofliq_IdentifyEndpoint
 {
     private Nofliq_RateLimiter $rateLimiter;
 
@@ -153,8 +153,8 @@ class IdentifyEndpoint
         // on the next page load, so the reconciliation writes to the same key
         // the lookup will later read from. Heap/custom use the raw ID; only
         // fingerprint hashes (to protect the IP). These two must stay in sync.
-        $destinationVisitorId = VisitorIdProvider::shouldHash()
-            ? hash('sha256', VisitorIdProvider::getHashPrefix() . $externalVisitorId)
+        $destinationVisitorId = Nofliq_VisitorIdProvider::shouldHash()
+            ? hash('sha256', Nofliq_VisitorIdProvider::getHashPrefix() . $externalVisitorId)
             : $externalVisitorId;
 
         // If both IDs are already the same, nothing to do.

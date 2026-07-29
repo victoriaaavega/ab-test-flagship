@@ -29,7 +29,7 @@ if (!defined('ABSPATH')) {
  * source — and is deleted. This keeps the SQL fallback faithful to live data
  * without ever leaving the table empty (the upsert runs before the delete).
  */
-class StatsRebuildJob {
+class Nofliq_StatsRebuildJob {
 
     /**
      * Runs both rebuilds and returns a combined result.
@@ -159,7 +159,7 @@ class StatsRebuildJob {
     private static function rebuildConversionStats(): array {
         global $wpdb;
 
-        $tracker = new ConversionTracker();
+        $tracker = new Nofliq_ConversionTracker();
 
         if (!$tracker->isAvailable()) {
             Nofliq_Logger::info('StatsRebuildJob: Redis unavailable, skipping conversion snapshot.');

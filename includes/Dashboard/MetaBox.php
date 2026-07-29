@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
  * Reads from wp_ab_test_stats (pre-calculated) instead of
  * running COUNT(*) live on wp_ab_test_assignments.
  */
-class MetaBox {
+class Nofliq_MetaBox {
 
     public function __construct() {
         add_action('wp_dashboard_setup', [$this, 'register']);

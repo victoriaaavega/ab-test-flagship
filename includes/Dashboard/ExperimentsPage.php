@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  *   - Passes feedback via ?abtf_notice=key&abtf_type=success|error in the URL
  *   - renderNotice() reads those params and prints the message via admin_notices
  */
-class ExperimentsPage
+class Nofliq_ExperimentsPage
 {
 
     private string $menuSlug  = 'abtf-experiments';

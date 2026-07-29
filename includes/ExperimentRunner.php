@@ -18,13 +18,13 @@ if (!defined('ABSPATH')) {
  *      high traffic). The activate must precede any conversion event for the
  *      visitor to be counted in Flagship's reporting.
  */
-class ExperimentRunner {
+class Nofliq_ExperimentRunner {
 
     private Nofliq_Fingerprint $fingerprint;
     private Nofliq_RedisClient $redis;
     private Nofliq_Database $database;
-    private DecisionAdapterInterface $adapter;
-    private FlagshipActivator $activator;
+    private Nofliq_DecisionAdapterInterface $adapter;
+    private Nofliq_FlagshipActivator $activator;
 
     /**
      * Guards the once-per-request cache-bypass header send. Static so the
@@ -39,12 +39,12 @@ class ExperimentRunner {
      */
     private static bool $bootstrapped = false;
 
-    public function __construct(DecisionAdapterInterface $adapter) {
+    public function __construct(Nofliq_DecisionAdapterInterface $adapter) {
         $this->fingerprint = new Nofliq_Fingerprint();
         $this->redis       = new Nofliq_RedisClient();
         $this->database    = new Nofliq_Database();
         $this->adapter     = $adapter;
-        $this->activator   = new FlagshipActivator();
+        $this->activator   = new Nofliq_FlagshipActivator();
     }
 
     /**

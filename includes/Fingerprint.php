@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
  *      when provider is 'fingerprint', or on the very first visit before
  *      visitor-sync.js has written the cookie.
  *
- * Whether the external ID is hashed is decided by VisitorIdProvider::shouldHash():
+ * Whether the external ID is hashed is decided by Nofliq_VisitorIdProvider::shouldHash():
  * fingerprint hashes (to protect the IP), heap/custom return the raw ID. As a
  * result the returned ID is NOT always a 64-char hex string anymore — heap
  * returns Heap's own format (e.g. a 16-digit numeric userId).
@@ -30,15 +30,15 @@ class Nofliq_Fingerprint
      */
     public function generateVisitorId(): string
     {
-        if (VisitorIdProvider::usesExternalId()) {
+        if (Nofliq_VisitorIdProvider::usesExternalId()) {
             $externalId = $this->readVisitorCookie();
 
             if ($externalId !== null) {
                 // Heap/custom return the RAW external ID so it matches exactly
                 // the ID the team's own integration sends to AB Tasty. Hashing is
                 // reserved for fingerprint, where it protects the visitor's IP.
-                if (VisitorIdProvider::shouldHash()) {
-                    return hash('sha256', VisitorIdProvider::getHashPrefix() . $externalId);
+                if (Nofliq_VisitorIdProvider::shouldHash()) {
+                    return hash('sha256', Nofliq_VisitorIdProvider::getHashPrefix() . $externalId);
                 }
 
                 return $externalId;
@@ -80,7 +80,7 @@ class Nofliq_Fingerprint
      */
     private function readVisitorCookie(): ?string
     {
-        $cookieName = VisitorIdProvider::COOKIE_NAME;
+        $cookieName = Nofliq_VisitorIdProvider::COOKIE_NAME;
 
         if (empty($_COOKIE[$cookieName])) {
             return null;

@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
  * All reads are cached statically for the lifetime of the request
  * to avoid repeated decryption on every call.
  */
-class CredentialsManager {
+class Nofliq_CredentialsManager {
 
     public const OPTION_ENV_ID  = 'abtf_flagship_env_id';
     public const OPTION_API_KEY = 'abtf_flagship_api_key';

@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  *
  * All reads are cached statically for the lifetime of the request.
  */
-class VisitorIdProvider
+class Nofliq_VisitorIdProvider
 {
     public const OPTION_PROVIDER = 'abtf_visitor_id_provider';
     public const OPTION_JS_PATH  = 'abtf_visitor_id_js_path';

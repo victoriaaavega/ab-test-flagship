@@ -21,18 +21,18 @@ if (!defined('ABSPATH')) {
  *   - success: did we record the conversion internally? (the endpoint's contract)
  *   - flagship: did the secondary hit reach Flagship? ('sent'|'failed'|'skipped')
  */
-class EventEndpoint
+class Nofliq_EventEndpoint
 {
     private const FLAGSHIP_EVENTS_URL = 'https://events.flagship.io';
     private const REQUEST_TIMEOUT     = 5; // seconds
 
     private Nofliq_RateLimiter $rateLimiter;
-    private ConversionTracker $conversionTracker;
+    private Nofliq_ConversionTracker $conversionTracker;
 
     public function __construct()
     {
         $this->rateLimiter       = new Nofliq_RateLimiter();
-        $this->conversionTracker = new ConversionTracker();
+        $this->conversionTracker = new Nofliq_ConversionTracker();
         add_action('rest_api_init', [$this, 'registerRoute']);
     }
 
@@ -231,7 +231,7 @@ class EventEndpoint
         string $variant,
         ?string $pageUrl
     ): array {
-        $envId = CredentialsManager::getEnvId();
+        $envId = Nofliq_CredentialsManager::getEnvId();
 
         if ($envId === null) {
             Nofliq_Logger::error('Flagship credentials not found. Hit not sent.');

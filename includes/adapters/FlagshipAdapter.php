@@ -22,7 +22,7 @@ use Flagship\Enum\CacheStrategy;
  * If credentials are not configured, decide() safely returns 'control' with null
  * IDs so the site always renders the original version instead of failing.
  */
-class FlagshipAdapter implements DecisionAdapterInterface
+class Nofliq_FlagshipAdapter implements Nofliq_DecisionAdapterInterface
 {
 
     private static bool $initialized = false;
@@ -37,8 +37,8 @@ class FlagshipAdapter implements DecisionAdapterInterface
             return;
         }
 
-        $envId  = CredentialsManager::getEnvId();
-        $apiKey = CredentialsManager::getApiKey();
+        $envId  = Nofliq_CredentialsManager::getEnvId();
+        $apiKey = Nofliq_CredentialsManager::getApiKey();
 
         if ($envId === null || $apiKey === null) {
             Nofliq_Logger::error('FlagshipAdapter: credentials not found.');
@@ -50,7 +50,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
             $apiKey,
             FlagshipConfig::decisionApi()
                 ->setLogLevel(LogLevel::ERROR)
-                ->setHitCacheImplementation(new HitCacheRedis())
+                ->setHitCacheImplementation(new Nofliq_HitCacheRedis())
                 ->setCacheStrategy(CacheStrategy::BATCHING_AND_CACHING_ON_FAILURE)
         );
 
@@ -70,7 +70,7 @@ class FlagshipAdapter implements DecisionAdapterInterface
      */
     public function decide(string $visitorId, string $experimentId): array
     {
-        if (!CredentialsManager::hasCredentials()) {
+        if (!Nofliq_CredentialsManager::hasCredentials()) {
             Nofliq_Logger::error('FlagshipAdapter: no credentials, serving control.');
             return $this->controlResult();
         }

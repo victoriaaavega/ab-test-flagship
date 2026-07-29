@@ -10,7 +10,7 @@ use Flagship\Cache\IHitCacheImplementation;
  * Redis implementation of Flagship's hit cache.
  * Stores failed hits and retries them automatically when Flagship::close() is called.
  */
-class HitCacheRedis implements IHitCacheImplementation {
+class Nofliq_HitCacheRedis implements IHitCacheImplementation {
 
     private const REDIS_HOST    = '127.0.0.1';
     private const REDIS_PORT    = 6379;

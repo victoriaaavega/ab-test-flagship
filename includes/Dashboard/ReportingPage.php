@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  * Unique visitor counts (the conversion-rate denominator) always come from
  * wp_ab_test_stats, the pre-aggregated assignment totals.
  */
-class ReportingPage
+class Nofliq_ReportingPage
 {
     private const MENU_SLUG = 'abtf-reporting';
     private const BASELINE  = 'control';
@@ -78,7 +78,7 @@ class ReportingPage
 
         check_admin_referer('abtf_rebuild_stats');
 
-        $result = StatsRebuildJob::run();
+        $result = Nofliq_StatsRebuildJob::run();
 
         $noticeKey  = $result['error'] === null ? 'stats_rebuilt' : 'stats_error';
         $noticeType = $result['error'] === null ? 'success' : 'error';
@@ -312,11 +312,11 @@ class ReportingPage
         // first. This keeps reporting consistent with how local mode records
         // conversions and avoids showing an empty Redis DB 3 while real data
         // sits in SQL.
-        if (DecisionMode::isLocal()) {
+        if (Nofliq_DecisionMode::isLocal()) {
             return [$this->fetchConversionDataFromLocal(), 'local', ''];
         }
 
-        $tracker = new ConversionTracker();
+        $tracker = new Nofliq_ConversionTracker();
 
         if ($tracker->isAvailable()) {
             return [$tracker->listAll(), 'redis', ''];

@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
  *
  * Endpoint: POST https://decision.flagship.io/v2/activate  → 204 No Content
  */
-class FlagshipActivator
+class Nofliq_FlagshipActivator
 {
     private const ACTIVATE_URL    = 'https://decision.flagship.io/v2/activate';
     private const REQUEST_TIMEOUT = 3; // seconds
@@ -33,7 +33,7 @@ class FlagshipActivator
      */
     public function activate(string $visitorId, string $variationGroupId, string $variationId): bool
     {
-        $envId = CredentialsManager::getEnvId();
+        $envId = Nofliq_CredentialsManager::getEnvId();
 
         if ($envId === null) {
             Nofliq_Logger::error('FlagshipActivator: no credentials, activate skipped.');

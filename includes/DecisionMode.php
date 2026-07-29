@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
  * site run experiments nobody asked for. Flagship is the default so a fresh
  * install never decides locally by accident.
  */
-class DecisionMode
+class Nofliq_DecisionMode
 {
     public const OPTION_MODE = 'abtf_decision_engine';
 
